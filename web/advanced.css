@@ -1,0 +1,207 @@
+#film-advanced-dialog {
+  width: min(890px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 22px;
+}
+
+.film-advanced-heading,
+.film-advanced-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.film-advanced-heading h2 {
+  margin: 7px 0 0;
+  font-size: 19px;
+}
+
+.film-advanced-close {
+  color: #aeb6c3;
+  font-size: 20px;
+  padding: 2px 9px;
+}
+
+.film-advanced-intro,
+.film-advanced-help,
+.film-advanced-selection {
+  color: #a2aab8;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.film-advanced-intro {
+  margin: 12px 0 8px;
+}
+
+.film-advanced-selection {
+  margin: 8px 0 14px;
+  padding: 8px 10px;
+  border: 1px solid #414651;
+  border-radius: 5px;
+  background: #202226;
+  color: #c4d7f7;
+  overflow-wrap: anywhere;
+}
+
+.film-advanced-section {
+  min-width: 0;
+  margin: 10px 0;
+  padding: 13px 14px;
+  border: 1px solid #3d424c;
+  border-radius: 7px;
+  background: #222429;
+}
+
+.film-advanced-section h3 {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e4ec;
+}
+
+.film-advanced-help {
+  margin: 4px 0 10px;
+}
+
+.film-advanced-field {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(100px, 2fr);
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  color: #aeb5c0;
+  font-size: 10px;
+}
+
+.film-advanced-field > input,
+.film-advanced-field > select,
+.film-advanced-field > textarea {
+  width: 100%;
+  min-width: 0;
+  color: #e0e4ec;
+  background: #17191d;
+  border: 1px solid #444954;
+  border-radius: 4px;
+  padding: 7px 8px;
+  font: 11px ui-monospace, SFMono-Regular, monospace;
+}
+
+.film-advanced-field > textarea {
+  resize: vertical;
+  line-height: 1.5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.film-advanced-field > input[type="file"] {
+  font-family: inherit;
+}
+
+.film-advanced-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: #aeb5c0;
+  font-size: 10px;
+}
+
+.film-advanced-check input {
+  accent-color: #76a9f4;
+}
+
+.film-advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.film-advanced-actions button,
+.film-advanced-actions select,
+#film-advanced-open {
+  border: 1px solid #454b57;
+  font-size: 10px;
+}
+
+.film-advanced-actions select {
+  flex: 1 1 180px;
+  min-width: 0;
+  background: #1a1c20;
+  padding: 6px;
+}
+
+.film-advanced-actions .film-advanced-primary,
+.film-advanced-footer .film-advanced-primary {
+  background: #337cdd;
+  color: white;
+  border-color: #518ee5;
+}
+
+.film-advanced-actions button:disabled {
+  opacity: .38;
+  cursor: default;
+}
+
+.film-advanced-footer {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid #3d424c;
+}
+
+.film-advanced-footer > span {
+  color: #8e96a3;
+  font-size: 10px;
+}
+
+#film-advanced-marker-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.film-advanced-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-left: 2px solid var(--marker-color, #66aaff);
+  opacity: .9;
+}
+
+.film-advanced-marker-label {
+  position: absolute;
+  left: 2px;
+  top: 1px;
+  max-width: 150px;
+  overflow: hidden;
+  color: #ecf2ff;
+  background: #18202bd9;
+  border-radius: 2px;
+  padding: 1px 4px;
+  font: 9px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#film-advanced-open {
+  color: #c5d8f6;
+  border-color: #46526a;
+}
+
+@media (max-width: 760px) {
+  #film-advanced-dialog {
+    width: 96vw;
+    padding: 15px;
+  }
+
+  .film-advanced-field {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}

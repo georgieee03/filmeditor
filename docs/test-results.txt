@@ -1,0 +1,3 @@
+Historical test-log pointer
+
+The raw log for this retired browser-integration package is not included in the public source. Its 48-test result is historical and does not describe the current native editor. See [VALIDATION.md](VALIDATION.md) for current evidence and limits, and [ACCEPTANCE.md](ACCEPTANCE.md) for the native acceptance workflow.

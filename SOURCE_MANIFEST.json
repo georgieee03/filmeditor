@@ -1,0 +1,390 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "c903898b9b83764a40aec38d4f59797707c6d68128f1702425a75b1089eea60a",
+      "bytes": 548
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "4a0746f4f99d9d07dee410f565c52ca4e150af10ee406b8852379d0b70e02750",
+      "bytes": 4992
+    },
+    {
+      "path": "CODEX_MAC_BUILD.md",
+      "sha256": "fe3b9f61aa9fe1fcc06900367a7c00b7e0826d85ce222e399f0bb1f2623e348c",
+      "bytes": 623
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "afc67d55eea9e9ad806a9a1946097339ae074580d9a0d258be5e5075e6c877a1",
+      "bytes": 1080
+    },
+    {
+      "path": "README.md",
+      "sha256": "aafc0772f7b262be5476208bdbd02392777121e6aa5c04db62f9734a5591ff2d",
+      "bytes": 14041
+    },
+    {
+      "path": "SECURITY.md",
+      "sha256": "babb908cbeb689df714c3f1eaba97fa94f0a505c6a691c36d240d7336a020efc",
+      "bytes": 3865
+    },
+    {
+      "path": "START_HERE.md",
+      "sha256": "447ceecc622590ec00c0361f3701c953ac2a14f8f78067bf2b79c7c402f37026",
+      "bytes": 494
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "9dc02f3668ae19ecdca8d212566f209084f0e5eceeb937a26f0bce4f58f8cfba",
+      "bytes": 2305
+    },
+    {
+      "path": "app.py",
+      "sha256": "f92264cd15ec54ce33c181331678e69e109f1c6b0dd8c8b52e61a454f2bbcbd2",
+      "bytes": 5618
+    },
+    {
+      "path": "docs/ACCEPTANCE.md",
+      "sha256": "564d993d1343795af53106db39e80e9c8eef8b1d9ab009b86452e55d47618ebc",
+      "bytes": 10691
+    },
+    {
+      "path": "docs/AI_PROVIDER_HANDOFF.md",
+      "sha256": "12c57b1a0c841326dcf6f607cc17780f2d2fc34ebf80832b6ca45c81c0ca0570",
+      "bytes": 33640
+    },
+    {
+      "path": "docs/AUTO_DETECTION.md",
+      "sha256": "ced3ddb5b53b01f8e2e2255c5451501c7e8452de0eda48a2eb7704c7ac250340",
+      "bytes": 16642
+    },
+    {
+      "path": "docs/CONTEXT_HANDOFF.md",
+      "sha256": "49a48e416ef9d10c19646058ac2a19ad483a40a4ef830146951791beefaff368",
+      "bytes": 12371
+    },
+    {
+      "path": "docs/MAC_HANDOFF_VALIDATION.md",
+      "sha256": "d85372249ceec580efdb2f434c7bd1174b4e87eadbd8f4645f9f96e9788ca3fa",
+      "bytes": 619
+    },
+    {
+      "path": "docs/MUSIC_RESEARCH.md",
+      "sha256": "e950cca39e818e1d01be808c4f4e817e73a27943c4286bc3ada3f0495e896bcb",
+      "bytes": 11011
+    },
+    {
+      "path": "docs/PREMIERE_PARITY.md",
+      "sha256": "0254b51494b1da6ea69e992c307ffa4fac5abf5762ccaeefcc03e4eb9dcaeed9",
+      "bytes": 19509
+    },
+    {
+      "path": "docs/REBUILD_RESEARCH.md",
+      "sha256": "4a5d548fb4a045ebe81a29bb9e7cd732e2cf121150037566f9590ac7baf92f75",
+      "bytes": 6893
+    },
+    {
+      "path": "docs/REVIEW_FINDINGS.md",
+      "sha256": "e7f4f8e152f414038a2b07dd6277bfa46507d2b9c55d2a5498fd7d5ec58a78b0",
+      "bytes": 19651
+    },
+    {
+      "path": "docs/VALIDATION.md",
+      "sha256": "202428b027d5c6214e4fd61833660efde6e83c0b778d1fbd4335345b85bb65e7",
+      "bytes": 15600
+    },
+    {
+      "path": "docs/mac-handoff-tests.txt",
+      "sha256": "f53ae3a1130cec54cac908d81241307b1d1f60f839ca7d16ec98505ad4440762",
+      "bytes": 345
+    },
+    {
+      "path": "docs/test-results.txt",
+      "sha256": "f53ae3a1130cec54cac908d81241307b1d1f60f839ca7d16ec98505ad4440762",
+      "bytes": 345
+    },
+    {
+      "path": "film/__init__.py",
+      "sha256": "3f456780a7dfb0b269b5121a8fef558949b61a29a0553037bbe6ad1cfa1301bf",
+      "bytes": 96
+    },
+    {
+      "path": "film/codex.py",
+      "sha256": "6081ef46392592457ad7ca0db45515c06afbcb8e9af74ee1e98d242089ec8762",
+      "bytes": 16862
+    },
+    {
+      "path": "film/core.py",
+      "sha256": "3afaacf275a5be85527e8cd27f8117455e45db51a9725af8c04d945cc96beb94",
+      "bytes": 37950
+    },
+    {
+      "path": "film/desktop.py",
+      "sha256": "c6ce4d2824069358b2f71864dd54fd4575e86f3e08be5cca6e6ac21cc0719bbe",
+      "bytes": 16621
+    },
+    {
+      "path": "film/editor.py",
+      "sha256": "6bb9c892a5095c0bf1025df3992f36719b8802b268fe26c7b7b7a8bd05dfc3d5",
+      "bytes": 13644
+    },
+    {
+      "path": "film/ingest.py",
+      "sha256": "b6e7c72d270d173d7cd1a8ac58943a2eb2047065bd488530d509928590ad5c67",
+      "bytes": 32147
+    },
+    {
+      "path": "film/library.py",
+      "sha256": "c4aaeb61045a97f625043bf84206aad14de7b3b0146e64f5ff42d34373cef7a6",
+      "bytes": 5463
+    },
+    {
+      "path": "film/music.py",
+      "sha256": "8827f7189b1dbfa37689e33341c19fe85caba36d3e886d84dcd7d0787c36947d",
+      "bytes": 35263
+    },
+    {
+      "path": "film/rpc.py",
+      "sha256": "4ee4588ae04965af45bba0df2c726ca2bacd9221e692049110d8ffadbf95569d",
+      "bytes": 4475
+    },
+    {
+      "path": "film/server.py",
+      "sha256": "f537a921e9fa8ed027b3780fb0e31b794939e78d5c8bfc2b291c1603b64f465e",
+      "bytes": 10825
+    },
+    {
+      "path": "native/FilmEditor.swift",
+      "sha256": "d95a88849edc6a9b20a4957978568b4bd370bfa0308ab9fad754fcaed43c0b4c",
+      "bytes": 32372
+    },
+    {
+      "path": "native/MakeIcon.swift",
+      "sha256": "25a62f341a52b5d7d47bd22e8b713269e03ca8e9dc219a649c797ecd7c091055",
+      "bytes": 2826
+    },
+    {
+      "path": "open-editor.command",
+      "sha256": "2c9bc8565a45c31c3602647f4c1054a7c8f8ecd43492040cc74a2179796b1304",
+      "bytes": 908
+    },
+    {
+      "path": "run-mac.command",
+      "sha256": "d6f820b015097b34a06d4f1ec39e94fbf43a5a547d859ab873512451bb222ddc",
+      "bytes": 443
+    },
+    {
+      "path": "scripts/bootstrap.py",
+      "sha256": "a4ffee835619d9da979779fea1b368ee1ba81c198f70f5bef0371ece9be651e5",
+      "bytes": 2914
+    },
+    {
+      "path": "scripts/build_mac_app.py",
+      "sha256": "7c102bb52f32bdaa59f76089abd38657a08f6aaeb525d2f48336758d8192ff6c",
+      "bytes": 10321
+    },
+    {
+      "path": "scripts/mac_audit.py",
+      "sha256": "a359e1ad13264cd5f52c037eb2ee20d13444a56c570975f4c5e209598ccacb93",
+      "bytes": 6735
+    },
+    {
+      "path": "scripts/manage_mac.py",
+      "sha256": "b25e015a06cafb3e907d2475dd45fa9f6e475c48ded2523ad3b002b5aa14295d",
+      "bytes": 3697
+    },
+    {
+      "path": "scripts/publish.py",
+      "sha256": "0f8613bc99cef7406240d24078ec0e70e824417c7127f2f5788f6d121281ef9e",
+      "bytes": 3170
+    },
+    {
+      "path": "scripts/register_codex.py",
+      "sha256": "f592ede16f014f8923afddfd9fc9ba647cc57ffafd5744051483aee97af5a6ea",
+      "bytes": 1170
+    },
+    {
+      "path": "start.command",
+      "sha256": "571c61fec778be33842814d144d3b168e9f1d0e4427cc644dbf9743a4f5f7e96",
+      "bytes": 910
+    },
+    {
+      "path": "stop-editor.command",
+      "sha256": "c9f314e2e65deebd374667ed37f1eb10113fbac9b17720ef2e5cf30851c5e97c",
+      "bytes": 123
+    },
+    {
+      "path": "tests/browser_projects.py",
+      "sha256": "603b7963fa49656e4a8bf48a3c7539a3631d477bb5ec75c15b6c1812543b1dd9",
+      "bytes": 4874
+    },
+    {
+      "path": "tests/browser_smoke.py",
+      "sha256": "cac011b181df3d6d78cb8ca6fbaf0eb4ad1f2246859a6171630cce16f0dcee4e",
+      "bytes": 4881
+    },
+    {
+      "path": "tests/fixture_engine.py",
+      "sha256": "580268f898dd9f2de204819cf3c218faa3870ef0d477680cd46fc86aebe29af5",
+      "bytes": 5040
+    },
+    {
+      "path": "tests/native_acceptance.py",
+      "sha256": "b70a152c255448fb82df01b0f99ceba743913d599c30abdd9b54fff36fb3a6e9",
+      "bytes": 6107
+    },
+    {
+      "path": "tests/native_ai_smoke.js",
+      "sha256": "4f1a57389e88625afcb783ebaabb26945c7afe46bf67e3ba11a51a5f551fb4eb",
+      "bytes": 2464
+    },
+    {
+      "path": "tests/native_smoke.js",
+      "sha256": "15f0767d2e774667e625921e03afbbb3f4558cdf83ba9f336bf369512f56f769",
+      "bytes": 5733
+    },
+    {
+      "path": "tests/real_advanced_acceptance.py",
+      "sha256": "f46268300cd8609d3b14a8a10a73818e19b04d669c97d7bd7ee5c0a9cdb908bd",
+      "bytes": 11457
+    },
+    {
+      "path": "tests/real_ai_edit_acceptance.py",
+      "sha256": "fb8f2af29f355c9ff5b3680110b297a91e64b346e2fec358499ec3c3a6e1514e",
+      "bytes": 6065
+    },
+    {
+      "path": "tests/real_detection_ui_acceptance.py",
+      "sha256": "9336415d94808a958e6c1242ebbe43cd902970ef65868c15b670c49d39f2f3d3",
+      "bytes": 5148
+    },
+    {
+      "path": "tests/real_editor_acceptance.py",
+      "sha256": "7f465cc4cca4ad913cd95ce136b4cddf88ec2aee7c9d99ce8fccaf02bf49671f",
+      "bytes": 15378
+    },
+    {
+      "path": "tests/real_music_ui_acceptance.py",
+      "sha256": "6ffe8deecfef73e24eaeb5033ec2dca56e811e8b503463a9e88cf4ef7a2cfde6",
+      "bytes": 8179
+    },
+    {
+      "path": "tests/test_app.py",
+      "sha256": "26d76af1534cb59b5ced67672250b432c18e4da2b9274500ceb19c196dae2943",
+      "bytes": 15497
+    },
+    {
+      "path": "tests/test_desktop.py",
+      "sha256": "d9d97d847a822f2a7c424e5446a978a00cfee3411b5ffaddbc79ea5b8c18bb54",
+      "bytes": 4705
+    },
+    {
+      "path": "tests/test_editor_v2.py",
+      "sha256": "e2b1ab4ee35f2e3a39912c6bb67cc1877f5a9ea5dd65e86de6ed24a24e81e3b5",
+      "bytes": 14354
+    },
+    {
+      "path": "tests/test_ingest.py",
+      "sha256": "ae6754166a6c1bac778f3005d6219699aa22d51a091aa55212f96ec8e23cb55d",
+      "bytes": 19475
+    },
+    {
+      "path": "tests/test_ingest_review.py",
+      "sha256": "8275ea0a395a0d0b2da9a70b8b0a03bc1f6b6b0ce0da1ab7616331d40e320546",
+      "bytes": 16226
+    },
+    {
+      "path": "tests/test_library.py",
+      "sha256": "12355dc9f4b876a8082135c3859edd1d468504619ce237b25faa1faf578f1e0d",
+      "bytes": 5333
+    },
+    {
+      "path": "tests/test_mac.py",
+      "sha256": "90f8ac9b94fee204ac04d308ac208795457e82e6a7d460933a66156cf0cca79a",
+      "bytes": 3940
+    },
+    {
+      "path": "tests/test_mac_service.py",
+      "sha256": "7a83e1ca2d1e0ff7bc2ddd12d4d26c0ba2dd99be715d5fd4f76154e4b27333f8",
+      "bytes": 1693
+    },
+    {
+      "path": "tests/test_mcp_review.py",
+      "sha256": "7661a6df1292d70bfe268d40940aa60f170e5a0882e7a41d201440845e18131a",
+      "bytes": 7834
+    },
+    {
+      "path": "tests/test_music.py",
+      "sha256": "07070d0416d93ddf1fd7eb199f777b2cc4cb79904b7190814bbfaa55b5a9440c",
+      "bytes": 21641
+    },
+    {
+      "path": "tests/test_music_review.py",
+      "sha256": "e83eb8740327300b62f616f590a9c5b8d1918d688a0f74944e95b0d3e06c2626",
+      "bytes": 17700
+    },
+    {
+      "path": "web/advanced.css",
+      "sha256": "a97c12c3be41eccfcea39bb88758c15255db2040ca05f56b2e56827e6757309d",
+      "bytes": 3606
+    },
+    {
+      "path": "web/advanced.js",
+      "sha256": "200ca49849eac23aa3900d30601831ea3ce54b5700b790ffe5716c8ebfe2bf74",
+      "bytes": 20026
+    },
+    {
+      "path": "web/app.js",
+      "sha256": "c18806d064b29b9d57b694421efa8187fadf9d88600ae0925d0d0518d388fb19",
+      "bytes": 55291
+    },
+    {
+      "path": "web/assistant.css",
+      "sha256": "f98348aa17f9643071d992df89e5fb3e96a2304d1d27b294018c0256295fe19b",
+      "bytes": 735
+    },
+    {
+      "path": "web/assistant.js",
+      "sha256": "85a175e25014a7d6a7d5f318217bfcce5cc550679319dd4117d9597b12a22708",
+      "bytes": 8118
+    },
+    {
+      "path": "web/desktop.js",
+      "sha256": "235aa373d455a0e073f9f2347d0873acbdad89b9c4bcea20c407a7187c87f22e",
+      "bytes": 2909
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "3507a31072b94e094b3ba32a1533ceb0f7af9f08cfd30d9cb64757afe4f84da8",
+      "bytes": 13168
+    },
+    {
+      "path": "web/music.css",
+      "sha256": "446ad278c9e6a2dbdb0da74e9b515aef5ac64b6f2daec670617fea754bd5eb34",
+      "bytes": 1029
+    },
+    {
+      "path": "web/music.js",
+      "sha256": "5beb211eab8ed2985a68d0b897325560e5f568349724e798196afd3f7d83ebcb",
+      "bytes": 6526
+    },
+    {
+      "path": "web/quickstart.css",
+      "sha256": "631f808c2c804da47fede6071d6cfed4fdd00312d432ddf562de4e621f593be4",
+      "bytes": 945
+    },
+    {
+      "path": "web/quickstart.js",
+      "sha256": "aa36008c4f0047c63b9006881ed696c9c7a702d08fd656fdfe319550c79937f2",
+      "bytes": 5249
+    },
+    {
+      "path": "web/style.css",
+      "sha256": "c92f6a48e392de844a0e3a77ea264588d3963893a47aee243c7a5eb4186ff861",
+      "bytes": 19171
+    }
+  ]
+}
