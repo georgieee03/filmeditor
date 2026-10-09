@@ -51,6 +51,14 @@ class LibraryTests(unittest.TestCase):
         for ident in ('../escape','missing',''):
             with self.assertRaises(ValueError):self.server.library.open(ident)
         with self.assertRaises(ValueError):self.server.library.create(' ')
+    def test_invalid_profile_does_not_allocate_project_or_engine_session(self):
+        for settings in ({'fps_num':0},{'fps_den':0},{'fps_num':None},{'fps_num':True},
+                         {'fps_num':29.97},{'width':0},{'height':15}):
+            with self.subTest(settings=settings),patch.object(self.server.library,'session') as session:
+                with self.assertRaises(ValueError):self.server.library.create('Invalid',**settings)
+                session.assert_not_called()
+                self.assertEqual(self.server.library.listing(),[])
+                self.assertFalse((self.ws.root/'projects').exists())
     def test_persistence(self):
         a,sa=self.create('Saved name')
         from film.library import Library

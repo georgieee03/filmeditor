@@ -23,8 +23,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "aafc0772f7b262be5476208bdbd02392777121e6aa5c04db62f9734a5591ff2d",
-      "bytes": 14041
+      "sha256": "d0b1a090f1b7453503fd69c8e48942c00da00b9a884c9c2f6b1cefd8b2f461fc",
+      "bytes": 14266
     },
     {
       "path": "SECURITY.md",
@@ -63,8 +63,8 @@
     },
     {
       "path": "docs/CONTEXT_HANDOFF.md",
-      "sha256": "49a48e416ef9d10c19646058ac2a19ad483a40a4ef830146951791beefaff368",
-      "bytes": 12371
+      "sha256": "543747f95c096b7c7daf78e8c69fbe91cca181782d362ad976fe322a621bcee6",
+      "bytes": 13076
     },
     {
       "path": "docs/MAC_HANDOFF_VALIDATION.md",
@@ -93,8 +93,8 @@
     },
     {
       "path": "docs/VALIDATION.md",
-      "sha256": "202428b027d5c6214e4fd61833660efde6e83c0b778d1fbd4335345b85bb65e7",
-      "bytes": 15600
+      "sha256": "d0a71b479143a46882d4bcb8b5ba39c4b5e09b1f6610c2c43e0049921b50f071",
+      "bytes": 17052
     },
     {
       "path": "docs/mac-handoff-tests.txt",
@@ -138,8 +138,8 @@
     },
     {
       "path": "film/library.py",
-      "sha256": "c4aaeb61045a97f625043bf84206aad14de7b3b0146e64f5ff42d34373cef7a6",
-      "bytes": 5463
+      "sha256": "0ec09e5459b3b666e948ef2b1f8cab586f17124387748430c3de92128a629541",
+      "bytes": 5736
     },
     {
       "path": "film/music.py",
@@ -242,6 +242,16 @@
       "bytes": 2464
     },
     {
+      "path": "tests/native_project_creation.js",
+      "sha256": "fddce733a2908327ccc88a78a5d0bad0e13d116d7f332c2756a9acf119b71c50",
+      "bytes": 2138
+    },
+    {
+      "path": "tests/native_project_creation.py",
+      "sha256": "e19e8e6c1e3993b773e3d96562a99f5e636bbe9354a4b17e0d5737513732d7c6",
+      "bytes": 3387
+    },
+    {
       "path": "tests/native_smoke.js",
       "sha256": "15f0767d2e774667e625921e03afbbb3f4558cdf83ba9f336bf369512f56f769",
       "bytes": 5733
@@ -298,8 +308,8 @@
     },
     {
       "path": "tests/test_library.py",
-      "sha256": "12355dc9f4b876a8082135c3859edd1d468504619ce237b25faa1faf578f1e0d",
-      "bytes": 5333
+      "sha256": "700922434aaa7afba2e7f05946e8a9b4ecf99bcf4f3030e2bea33ab3cc8884e5",
+      "bytes": 5957
     },
     {
       "path": "tests/test_mac.py",
@@ -338,8 +348,8 @@
     },
     {
       "path": "web/app.js",
-      "sha256": "c18806d064b29b9d57b694421efa8187fadf9d88600ae0925d0d0518d388fb19",
-      "bytes": 55291
+      "sha256": "db4f9aa4edba5a9d26dedf3a31caaf6df770bbbc636024c8800f0f06b418d796",
+      "bytes": 55507
     },
     {
       "path": "web/assistant.css",

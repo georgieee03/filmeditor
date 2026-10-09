@@ -31,6 +31,9 @@ class Library:
         if not isinstance(name,str) or not name.strip() or len(name.strip())>100: raise ValueError('Enter a project name of 1–100 characters')
         automatic=settings.pop('auto_configure',True)
         if type(automatic) is not bool: raise ValueError('auto_configure must be a boolean')
+        for field,minimum in (('width',16),('height',16),('fps_num',1),('fps_den',1)):
+            if field in settings and (type(settings[field]) is not int or settings[field]<minimum):
+                raise ValueError(f'{field} must be an integer of at least {minimum}')
         ident=uuid.uuid4().hex
         with self.lock:
             entry={'id':ident,'name':name.strip(),'created':time.time()}

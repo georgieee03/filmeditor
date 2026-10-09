@@ -1,6 +1,14 @@
 # Validation record
 
-## Current editor rebuild — 2026-10-08
+## Home-screen project creation fix — 2026-10-08
+
+Automatic mode disables the frame-rate selector. Disabled controls are omitted from `FormData`, so the earlier form converted a missing value to zero and the real engine rejected project creation. Automatic projects now explicitly start at 30/1 until imported media supplies a detected profile; manual formats keep the selected rate. The backend rejects invalid dimensions/rates before allocating a workspace or engine session.
+
+The installed-app regression in `tests/native_project_creation.py` reproduced the exact zero-FPS error on the previous bundle, then passed on the rebuilt bundle. It submits the actual WKWebView home form for default Automatic, manual Vertical at 24 fps, and Manual 60 fps switched back to Automatic. It checks the real MLT profile, automatic-mode persistence, six empty tracks, project reopening, backend shutdown, and the app signature. Navigation is deferred while batching the three form submissions; each resulting project is subsequently opened in a fresh native launch. All projects are temporary and removed; no video, audio, or model turn is created. Detailed reports remain in ignored `reports/rebuild/project-creation/`.
+
+The updated source suite passes **162 tests** in 15.873 seconds. JavaScript syntax checks pass. The broader render and live AI evidence below belongs to release `9d2cdd1`; those media workflows were unchanged by this focused fix.
+
+## Native editor rebuild baseline — 2026-10-08
 
 The frozen source and installed native app passed scoped acceptance on 2026-10-08. The corrected native AI-button run authored the requested clip, completed MLT preview and render-status calls with no failed MCP tools or shell recovery, fully decoded the H.264 export, produced no approval events, left the source unchanged, and retained a valid app signature after the live turn. Earlier Codex 0.162.0-alpha.2 runs exposed rejection of optional MCP content annotations; `app.py` now strips only those fields at the stdio boundary. The final general launch/reopen run also passed, and the final build report confirms source equality for 23 bundled files. Binary SHA-256: `e700c0c75dc7645ad34c2e9bbbbc3547101ac3997e38a9263f72202c356e19cb`. Evidence covers the exact local build and synthetic media paths described here; it is not a general production-readiness or Premiere-parity claim.
 
