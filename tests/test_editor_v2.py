@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 import tempfile
 import threading
@@ -44,6 +45,94 @@ class EditorV2Tests(unittest.TestCase):
     def test_manual_edit_requires_revision_and_operations(self):
         with self.assertRaises(ValueError):self.server.editor.edit('',[{'op':'set_notes'}],project_path='edits/test.mlt')
         with self.assertRaises(ValueError):self.server.editor.edit('x',[],project_path='edits/test.mlt')
+
+    def test_still_source_uses_edit_duration_not_probe_cadence(self):
+        path=self.ws.root/'originals/still.jpeg';path.write_bytes(b'fixture')
+        asset=self.ws.register(path,path.name)
+        probe={'format':{'format_name':'image2','duration':'0.04'},'streams':[{'index':0,'codec_type':'video','codec_name':'mjpeg','nb_frames':'1'}]}
+        def prepare(command,timeout):
+            Path(command[-1]).write_bytes(b'thumbnail fixture')
+            return SimpleNamespace(returncode=0,stderr=b'')
+        with patch.object(self.ws,'probe',return_value=probe),patch.object(self.ws,'run_media',side_effect=prepare):
+            result=self.server.editor.media(asset['id'])
+        self.assertEqual(result['kind'],'image')
+        self.assertEqual(result['duration'],5.0)
+
+    def test_source_type_follows_media_probe_when_extension_disagrees(self):
+        cases=[('movie.jpeg',{'format_name':'mov,mp4,m4a,3gp,3g2,mj2','duration':'2.5'},
+                {'codec_name':'h264','pix_fmt':'yuv420p','width':640,'height':360},'video',2.5,'.mp4'),
+               ('still.mp4',{'format_name':'jpeg_pipe','duration':'0.04'},
+                {'codec_name':'mjpeg','width':640,'height':360,'nb_frames':'1'},'image',5.0,'.jpg')]
+        for name,format_,video,kind,duration,suffix in cases:
+            with self.subTest(name=name):
+                path=self.ws.root/'originals'/name;path.write_bytes(b'fixture')
+                asset=self.ws.register(path,name)
+                probe={'format':format_,'streams':[{'index':0,'codec_type':'video',**video}]}
+                def prepare(command,timeout):
+                    Path(command[-1]).write_bytes(b'prepared fixture')
+                    return SimpleNamespace(returncode=0,stderr=b'')
+                with patch.object(self.ws,'probe',return_value=probe),patch.object(self.ws,'run_media',side_effect=prepare):
+                    result=self.server.editor.media(asset['id'],proxy=True)
+                self.assertEqual(result['kind'],kind)
+                self.assertEqual(result['duration'],duration)
+                self.assertTrue(result['proxy'])
+                self.assertTrue(result['url'].split('?')[0].endswith('/media'))
+                from urllib.parse import parse_qs,urlsplit
+                self.assertTrue(parse_qs(urlsplit(result['url']).query)['path'][0].endswith(suffix))
+
+    def test_fast_media_metadata_and_thumbnail_preparation_skip_waveform(self):
+        path=self.ws.root/'originals/long.mp4';path.write_bytes(b'fixture')
+        asset=self.ws.register(path,path.name)
+        probe={'format':{'format_name':'mov,mp4','duration':'3600'},'streams':[
+            {'index':0,'codec_type':'video','codec_name':'h264','pix_fmt':'yuv420p','width':640,'height':360},
+            {'index':1,'codec_type':'audio','codec_name':'aac'}]}
+        commands=[]
+        def prepare(command,timeout):
+            commands.append(command)
+            Path(command[-1]).write_bytes(b'thumbnail fixture')
+            return SimpleNamespace(returncode=0,stderr=b'')
+        with patch.object(self.ws,'probe',return_value=probe),patch.object(self.ws,'run_media',side_effect=prepare):
+            metadata=self.server.editor.media(asset['id'],metadata_only=True)
+            self.assertEqual(metadata['duration'],3600)
+            self.assertEqual(commands,[])
+            thumb=self.server.editor.media(asset['id'],thumbnail_only=True)
+            self.assertIn('thumbnail',thumb)
+            self.assertNotIn('waveform',thumb)
+            source=self.server.editor.media(asset['id'],proxy=True)
+            self.assertFalse(source['proxy'])
+            self.assertEqual(len(commands),1)
+            self.assertFalse(any('showwavespic' in ' '.join(command) for command in commands))
+
+    def test_source_proxy_uses_real_video_stream_and_skips_cover_art(self):
+        path=self.ws.root/'originals/camera.mov';path.write_bytes(b'fixture')
+        asset=self.ws.register(path,path.name)
+        probe={'format':{'format_name':'mov,mp4','duration':'3'},'streams':[
+            {'index':0,'codec_type':'video','codec_name':'mjpeg','disposition':{'attached_pic':1}},
+            {'index':2,'codec_type':'video','codec_name':'hevc','pix_fmt':'yuv420p10le','width':3840,'height':2160},
+            {'index':3,'codec_type':'audio','codec_name':'pcm_s16le'}]}
+        commands=[]
+        def prepare(command,timeout):
+            commands.append(command)
+            Path(command[-1]).write_bytes(b'prepared fixture')
+            return SimpleNamespace(returncode=0,stderr=b'')
+        with patch.object(self.ws,'probe',return_value=probe),patch.object(self.ws,'run_media',side_effect=prepare):
+            result=self.server.editor.media(asset['id'],proxy=True)
+        self.assertEqual(result['kind'],'video')
+        self.assertTrue(result['proxy'])
+        maps=[command[i+1] for command in commands for i,arg in enumerate(command[:-1]) if arg=='-map']
+        self.assertIn('0:2',maps)
+        self.assertIn('0:3',maps)
+        self.assertNotIn('0:0',maps)
+        self.assertFalse(any('showwavespic' in ' '.join(command) for command in commands))
+
+    def test_durationless_movie_is_not_a_five_second_still(self):
+        path=self.ws.root/'originals/untimed.mov';path.write_bytes(b'fixture')
+        asset=self.ws.register(path,path.name)
+        probe={'format':{'format_name':'mov,mp4','duration':'N/A'},'streams':[{'codec_type':'video','codec_name':'h264'}]}
+        with patch.object(self.ws,'probe',return_value=probe),patch.object(self.ws,'run_media') as prepare:
+            with self.assertRaisesRegex(ValueError,'duration is missing'):
+                self.server.editor.media(asset['id'],metadata_only=True)
+            prepare.assert_not_called()
     def test_stale_history_never_restores_backup(self):
         self.ws.data['active_project']='edits/test.mlt'
         with patch.object(self.ws,'forward') as forward:

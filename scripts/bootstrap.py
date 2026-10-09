@@ -6,8 +6,11 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+try:
+    from .managed_shotcut import SHOTCUT_COMMIT,prepare_bridge
+except ImportError:
+    from managed_shotcut import SHOTCUT_COMMIT,prepare_bridge
 ROOT=Path(__file__).resolve().parents[1]
-SHOTCUT_COMMIT='f1b78d350a9992296f0b7f11a55c04819ea25730'
 HYPERFRAMES='0.8.100'
 GSAP='3.12.5'
 
@@ -23,16 +26,12 @@ def main():
     if not shutil.which('git'): raise SystemExit('Git required; install Apple command-line tools first')
     deps=ROOT/'.deps'; deps.mkdir(exist_ok=True)
     bridge=deps/'shotcut-mcp'
-    if bridge.exists():
-        sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=bridge,text=True).strip()
-        dirty=subprocess.check_output(['git','status','--porcelain'],cwd=bridge,text=True).strip()
-        if sha!=SHOTCUT_COMMIT or dirty: raise SystemExit('Existing bridge differs or is modified; preserve/reconcile it manually')
-        print('Shotcut MCP already at the pinned revision')
-    else:
+    if not bridge.exists():
         run(['git','init',str(bridge)])
         run(['git','remote','add','origin','https://github.com/matrodrigs/shotcut-mcp.git'],bridge)
         run(['git','fetch','--depth=1','origin',SHOTCUT_COMMIT],bridge)
         run(['git','checkout','--detach','FETCH_HEAD'],bridge)
+    print('Shotcut MCP at pinned revision: '+prepare_bridge(bridge))
     if not opts.shotcut_only:
         if not shutil.which('node') or not shutil.which('npm'): raise SystemExit('Node.js 22+ and npm required')
         version=subprocess.check_output(['node','--version'],text=True).strip()
@@ -49,3 +48,4 @@ def main():
 if __name__=='__main__':
     try: main()
     except subprocess.CalledProcessError as exc: raise SystemExit(f'Installation command failed ({exc.returncode}); engine readiness not established')
+    except (OSError,ValueError) as exc: raise SystemExit(str(exc))

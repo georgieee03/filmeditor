@@ -1,0 +1,89 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 69acd4c2df7fb4a0d05d6b83d6bd80ee2c6db903..dc43f966a92357f466c552d34ace4aa6598bf4c6 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,11 @@
+ # Changelog
+ 
++## Unreleased
++
++### Fixed
++
++- Treat PNG, JPEG and WebP inputs as stills when adding or replacing clips, even when FFprobe reports a single-frame duration. Use the requested still duration and the QImage producer.
++
+ ## 1.5.6 (2026-09-12)
+ 
+ ### Changed
+diff --git a/shotcut_mcp/project_document.py b/shotcut_mcp/project_document.py
+index 73847476a9f5b6444865fafa58edf051a9fa718d..ec200dba2042b23a55d0782c11a5a534ab969c21 100644
+--- a/shotcut_mcp/project_document.py
++++ b/shotcut_mcp/project_document.py
+@@ -33,6 +33,7 @@ from .mlt_xml import resource_references
+ from .protocol import is_array, is_object
+ 
+ SEQUENCE_TAGS = {"entry", "blank"}
++STILL_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+ BACKGROUND_ID = "background"
+ MAIN_BIN_IDS = {"main_bin", "main bin"}
+ DocumentT = TypeVar("DocumentT", bound="ProjectDocument")
+@@ -1363,7 +1364,13 @@ class ProjectDocument:
+         if not media_path.is_file():
+             raise ToolError(f"Media not found: {media_path}")
+         probe = probe_media_raw(media_path)
+-        duration_seconds = media_duration(probe)
++        # FFprobe can report one frame's cadence as a JPEG/PNG duration.
++        # A still's timeline length comes from the edit, not that probe value.
++        duration_seconds = (
++            None
++            if media_path.suffix.lower() in STILL_IMAGE_SUFFIXES
++            else media_duration(probe)
++        )
+         producer_service = _media_producer_service(probe, duration_seconds)
+         image_duration = _number(
+             operation.get("image_duration_seconds", 5.0), "image_duration_seconds", 0.04
+@@ -1509,7 +1516,11 @@ class ProjectDocument:
+         if not media_path.is_file():
+             raise ToolError(f"Media not found: {media_path}")
+         payload = probe_media_raw(media_path)
+-        duration_seconds = media_duration(payload)
++        duration_seconds = (
++            None
++            if media_path.suffix.lower() in STILL_IMAGE_SUFFIXES
++            else media_duration(payload)
++        )
+         producer_service = _media_producer_service(payload, duration_seconds)
+         full_frames = (
+             max(1, math.ceil(duration_seconds * self.fps))
+diff --git a/tests/test_project_features.py b/tests/test_project_features.py
+index b676612fc3166f883c28385f2274324556c8d66d..c1f576e7c33227fb1b3752f66ce4fb6b7ee44103 100644
+--- a/tests/test_project_features.py
++++ b/tests/test_project_features.py
+@@ -890,9 +890,9 @@ class ProjectFeatureTests(unittest.TestCase):
+ 
+     def test_still_images_use_qimage_across_creation_and_replacement(self) -> None:
+         def probe(path: Path) -> dict[str, object]:
+-            if path.suffix.lower() == ".png":
++            if path.suffix.lower() in {".png", ".jpeg"}:
+                 return {
+-                    "format": {},
++                    "format": {"duration": "0.04"},
+                     "streams": [{"codec_type": "video", "codec_name": "png"}],
+                 }
+             return {
+@@ -917,7 +917,7 @@ class ProjectFeatureTests(unittest.TestCase):
+         ):
+             root = Path(directory)
+             video = root / "source.mp4"
+-            first_image = root / "first.png"
++            first_image = root / "first.jpeg"
+             second_image = root / "second.png"
+             for path in (video, first_image, second_image):
+                 path.write_bytes(path.name.encode())
+@@ -935,6 +935,7 @@ class ProjectFeatureTests(unittest.TestCase):
+                 }
+             )
+             item = created["project"]["tracks"][0]["items"][0]
++            self.assertEqual(item["duration_frames"], 60)
+             self.assertEqual(
+                 producer_properties(image_project, item["producer_id"])["mlt_service"],
+                 "qimage",

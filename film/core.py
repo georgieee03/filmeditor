@@ -144,6 +144,9 @@ class Workspace:
         return {'deleted':ident,'retained':'Source copy retained for saved timelines and render snapshots.'}
 
     def ingest(self, stream, length, filename, kind):
+        def check_open():
+            if self.stopping: raise ValueError('Workspace is closing; import cancelled')
+        with self.lock: check_open()
         suffix = Path(filename).suffix.lower()
         if suffix not in MEDIA or kind not in ('footage','reference','audio','lut'): raise ValueError('Unsupported import type')
         if not 0 < length <= 32*1024**3: raise ValueError('Import must be between 1 byte and 32 GiB')
@@ -155,12 +158,16 @@ class Workspace:
             with temp.open('xb') as f:
                 remaining=length
                 while remaining:
+                    with self.lock: check_open()
                     b=stream.read(min(1024**2,remaining))
+                    with self.lock: check_open()
                     if not b: raise ValueError('Incomplete upload')
                     f.write(b); digest.update(b); remaining-=len(b)
                 f.flush(); os.fsync(f.fileno())
-            os.replace(temp,dest); dest.chmod(0o444)
-            return self.register(dest,Path(filename).name,kind,digest.hexdigest())
+            with self.lock:
+                check_open()
+                os.replace(temp,dest); dest.chmod(0o444)
+                return self.register(dest,Path(filename).name,kind,digest.hexdigest())
         finally: temp.unlink(missing_ok=True)
 
     def executable(self,name):
@@ -220,9 +227,10 @@ class Workspace:
     def tools(self):
         from .music import MUSIC_TOOLS
         from .ingest import FILM_INGEST_TOOLS
+        from .enhance import ENHANCE_TOOLS
         try: self.connect_shotcut()
         except Exception as exc: self.engine_error=str(exc)
-        return copy.deepcopy(TOOLS+MUSIC_TOOLS+FILM_INGEST_TOOLS+self.engine_tools)
+        return copy.deepcopy(TOOLS+MUSIC_TOOLS+FILM_INGEST_TOOLS+ENHANCE_TOOLS+self.engine_tools)
 
     def active(self):
         with self.lock:
@@ -511,7 +519,12 @@ class Workspace:
 
     def call(self,name,args):
         if not isinstance(args,dict): raise ValueError('Arguments must be an object')
-        if name in ('film_detect_media','film_configure_from_media'):
+        if name.startswith('film_enhance_'):
+            from .enhance import Enhance
+            with self.lock:
+                if not hasattr(self,'enhance'): self.enhance=Enhance(self)
+            value=self.enhance.dispatch(name,args)
+        elif name in ('film_detect_media','film_configure_from_media'):
             from .ingest import Ingest
             with self.lock:
                 if not hasattr(self,'ingest_tools'): self.ingest_tools=Ingest(self)

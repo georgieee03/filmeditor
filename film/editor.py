@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import math
 from pathlib import Path
 import subprocess
 import threading
@@ -113,27 +114,50 @@ class Editor:
             h['revision']=result['revision']; self.save()
             return self.snapshot(path)
 
-    def media(self, asset_id, proxy=False):
+    def media(self, asset_id, proxy=False, metadata_only=False, thumbnail_only=False):
+        if any(type(flag) is not bool for flag in (proxy,metadata_only,thumbnail_only)):
+            raise ValueError('Media preparation options must be booleans')
+        if metadata_only and thumbnail_only or proxy and (metadata_only or thumbnail_only):
+            raise ValueError('Choose one media preparation mode')
         asset=self.ws.asset(asset_id); path=self.ws.path(asset['path'])
         if path.suffix.lower() in {'.cube','.srt','.vtt'}:
             return {'asset_id':asset_id,'kind':'data','url':self.server.media_url(path),'duration':0}
         info=self.ws.probe(asset_id)
         streams=info.get('streams',[])
-        video=next((s for s in streams if s.get('codec_type')=='video' and not s.get('disposition',{}).get('attached_pic')),None)
-        audio=next((s for s in streams if s.get('codec_type')=='audio'),None)
-        duration=float(info.get('format',{}).get('duration') or (video or {}).get('duration') or 5)
+        videos=[s for s in streams if s.get('codec_type')=='video' and not s.get('disposition',{}).get('attached_pic')]
+        video=next((s for s in videos if s.get('disposition',{}).get('default')),videos[0] if videos else None)
+        audios=[s for s in streams if s.get('codec_type')=='audio']
+        audio=next((s for s in audios if s.get('disposition',{}).get('default')),audios[0] if audios else None)
+        from .ingest import Ingest
+        detected=Ingest.classify(asset,info)
+        kind=detected['kind']
+        if kind=='unknown' or kind=='image' and not video:
+            raise ValueError('No readable video, image, or audio stream was reported')
+        duration=5.0 if kind=='image' else None
+        if duration is None:
+            for candidate in (info.get('format',{}).get('duration'),(video or {}).get('duration'),(audio or {}).get('duration')):
+                try: seconds=float(candidate)
+                except (TypeError,ValueError): continue
+                if math.isfinite(seconds) and 0<seconds<=86400*30:
+                    duration=seconds; break
+        if duration is None:
+            raise ValueError('Media duration is missing or invalid. Use a source with readable timing metadata.')
         stamp=hashlib.sha256(f'{path}:{path.stat().st_size}:{path.stat().st_mtime_ns}'.encode()).hexdigest()[:16]
         thumbnail=self.ws.root/f'cache/thumb-{stamp}.jpg'
         waveform=self.ws.root/f'cache/wave-{stamp}.png'
         playable=path
         # A browser proxy is for responsive source inspection; MLT always renders originals.
-        compatible=(path.suffix.lower() in IMAGE or (video and video.get('codec_name')=='h264'
+        compatible=(kind=='image' and path.suffix.lower() in IMAGE and video.get('codec_name') in ('mjpeg','png','webp')
+                    or (kind=='video' and video.get('codec_name')=='h264'
                     and video.get('pix_fmt') in ('yuv420p','yuvj420p') and path.suffix.lower() in ('.mp4','.m4v','.mov'))
                     or (not video and path.suffix.lower() in ('.mp3','.wav','.m4a')))
-        needs_proxy=not compatible or bool(video and path.suffix.lower() not in IMAGE
+        needs_proxy=not compatible or bool(kind=='video'
             and (int(video.get('width') or 0)>1280 or int(video.get('height') or 0)>720))
-        target=self.ws.root/f'cache/proxy-{stamp}.mp4'
+        target=self.ws.root/(f'cache/source-{stamp}.jpg' if kind=='image' else f'cache/proxy-{stamp}.mp4')
         if proxy and needs_proxy and target.exists(): playable=target
+        def mapping(stream, fallback):
+            index=(stream or {}).get('index')
+            return f'0:{index}' if type(index) is int and index>=0 else fallback
         def run(arguments, destination, timeout=180):
             temp=destination.with_name(uuid.uuid4().hex+destination.suffix)
             try:
@@ -142,24 +166,33 @@ class Editor:
                 if r.returncode or not temp.is_file(): raise ValueError(r.stderr.decode(errors='replace')[-1600:] or 'Media preparation failed')
                 temp.replace(destination)
             finally: temp.unlink(missing_ok=True)
-        needs=(video and not thumbnail.exists()) or (audio and not waveform.exists()) or (proxy and needs_proxy and not target.exists())
+        need_thumbnail=bool(video and not thumbnail.exists() and not metadata_only)
+        # Waveforms analyze the entire source. Source selection waits only for
+        # playable media; import/background preparation can request the waveform.
+        need_waveform=bool(audio and not waveform.exists() and not (proxy or metadata_only or thumbnail_only))
+        needs=need_thumbnail or need_waveform or (proxy and needs_proxy and not target.exists())
         if needs:
             with self.media_lock, self.ws.heavy():
                 if video and not thumbnail.exists():
-                    run(['-frames:v','1','-vf','scale=320:180:force_original_aspect_ratio=decrease','-an'],thumbnail)
-                if audio and not waveform.exists():
+                    run(['-map',mapping(video,'0:v:0'),'-frames:v','1','-vf','scale=320:180:force_original_aspect_ratio=decrease','-an'],thumbnail)
+                if need_waveform and not waveform.exists():
                     run(['-filter_complex','aformat=channel_layouts=mono,showwavespic=s=1200x64:colors=9fdac6','-frames:v','1'],waveform)
                 if proxy and needs_proxy:
                     if not target.exists():
-                        args=['-map','0:v:0?','-map','0:a:0?']
-                        if video: args+=['-vf','scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p']
-                        args+=['-c:a','aac','-b:a','128k','-movflags','+faststart']
+                        args=[]
+                        if video: args+=['-map',mapping(video,'0:v:0')]
+                        if kind=='image':
+                            args+=['-frames:v','1','-vf','scale=1280:720:force_original_aspect_ratio=decrease','-an']
+                        else:
+                            if audio: args+=['-map',mapping(audio,'0:a:0')]
+                            if video: args+=['-vf','scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2','-c:v','libx264','-preset','ultrafast','-crf','23','-pix_fmt','yuv420p']
+                            args+=['-c:a','aac','-b:a','128k','-movflags','+faststart']
                         run(args,target,1800)
                     playable=target
         value={'asset_id':asset_id,'duration':duration,'width':(video or {}).get('width'),
                'height':(video or {}).get('height'),'codec':(video or audio or {}).get('codec_name'),
-               'has_audio':bool(audio),'has_video':bool(video),'proxy':playable!=path,
-               'kind':'image' if path.suffix.lower() in IMAGE else 'video' if video else 'audio',
+               'has_audio':bool(audio),'has_video':bool(video),'proxy':playable!=path,'needs_proxy':bool(needs_proxy),
+               'kind':kind,
                'url':self.server.media_url(playable)}
         if thumbnail.exists(): value['thumbnail']=self.server.media_url(thumbnail)
         if waveform.exists(): value['waveform']=self.server.media_url(waveform)

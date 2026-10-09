@@ -1,0 +1,464 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 69acd4c2df7fb4a0d05d6b83d6bd80ee2c6db903..44045f5c3fe610b2939aeaafde409861cb830c74 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,14 @@
+ # Changelog
+ 
++## Unreleased
++
++### Fixed
++
++- Treat PNG, JPEG and WebP inputs as stills when adding or replacing clips, even when FFprobe reports a single-frame duration. Use the requested still duration and the QImage producer.
++- Require positive still-image probe evidence instead of a filename suffix or missing duration. Preserve motion-video producers when names disagree and report unresolved video/audio timing without treating it as a still.
++- Pin the probed absolute video/audio indices when creating, replacing or relinking media. Skip attached artwork, choose the default playable streams, and disable missing streams instead of decoding an audio-first movie as a frozen frame.
++- Consume explicitly marked technical empty-track placeholders on first placement, including position zero and newly emptied tracks. Preserve intentional and legacy one-frame gaps without adding a trailing black frame.
++
+ ## 1.5.6 (2026-09-12)
+ 
+ ### Changed
+diff --git a/shotcut_mcp/project_document.py b/shotcut_mcp/project_document.py
+index 73847476a9f5b6444865fafa58edf051a9fa718d..bd7f5cb70b38a9ede4fb91b06ace348402f07eb1 100644
+--- a/shotcut_mcp/project_document.py
++++ b/shotcut_mcp/project_document.py
+@@ -33,6 +33,9 @@ from .mlt_xml import resource_references
+ from .protocol import is_array, is_object
+ 
+ SEQUENCE_TAGS = {"entry", "blank"}
++STILL_IMAGE_FORMATS = {"image2", "image2pipe", "jpeg_pipe", "png_pipe", "webp_pipe"}
++STILL_IMAGE_CODECS = {"mjpeg", "png", "webp"}
++EMPTY_TRACK_PROPERTY = "shotcut:mcpEmptyTrack"
+ BACKGROUND_ID = "background"
+ MAIN_BIN_IDS = {"main_bin", "main bin"}
+ DocumentT = TypeVar("DocumentT", bound="ProjectDocument")
+@@ -280,17 +283,63 @@ def _boolean(value: object, label: str) -> bool:
+     return value
+ 
+ 
++def _is_still_image(payload: ProbePayload) -> bool:
++    """Use positive probe evidence; a suffix or missing duration is not a still."""
++    container = payload.get("format", {})
++    formats = str(container.get("format_name", "")).split(",")
++    if not STILL_IMAGE_FORMATS.intersection(formats):
++        return False
++    streams = payload.get("streams", [])
++    videos = []
++    for stream in streams:
++        if stream.get("codec_type") == "audio":
++            return False
++        disposition = stream.get("disposition", {})
++        attached = is_object(disposition) and disposition.get("attached_pic") in (1, True)
++        if stream.get("codec_type") == "video" and not attached:
++            videos.append(stream)
++    if len(videos) != 1 or videos[0].get("codec_name") not in STILL_IMAGE_CODECS:
++        return False
++    count = videos[0].get("nb_frames")
++    if count in (None, "", "N/A"):
++        return True
++    try:
++        return str(count).isdigit() and int(str(count)) <= 1
++    except (ValueError, TypeError):
++        return False
++
++
+ def _media_producer_service(
+     payload: ProbePayload, duration_seconds: float | None
+ ) -> str:
+-    if duration_seconds is not None:
+-        return "avformat-novalidate"
+-    streams = payload.get("streams")
+-    if is_array(streams) and any(
+-        is_object(stream) and stream.get("codec_type") == "video" for stream in streams
+-    ):
++    if _is_still_image(payload):
+         return "qimage"
+-    raise ToolError("Media has no duration or still-image video stream.")
++    if duration_seconds is not None and math.isfinite(duration_seconds) and duration_seconds > 0:
++        return "avformat-novalidate"
++    raise ToolError("Media duration is missing or invalid. Video/audio requires readable timing metadata; only confirmed still images use a still duration.")
++
++
++def _media_stream_indices(payload: ProbePayload) -> dict[str, int]:
++    """Pin absolute decoder streams; avformat-novalidate does not select them."""
++    streams = payload.get("streams", [])
++    if not streams:
++        raise ToolError("Media has no readable streams for decoder selection.")
++    def selected_index(kind: str) -> int:
++        candidates = []
++        for stream in streams:
++            disposition = stream.get("disposition", {})
++            attached = is_object(disposition) and disposition.get("attached_pic") in (1, True)
++            if stream.get("codec_type") == kind and not (kind == "video" and attached):
++                candidates.append(stream)
++        if not candidates:
++            return -1
++        selected = next((stream for stream in candidates if is_object(stream.get("disposition"))
++                         and stream["disposition"].get("default") in (1, True)), candidates[0])
++        index = selected.get("index")
++        if type(index) is not int or index < 0:
++            raise ToolError(f"The selected {kind} stream has no readable absolute index.")
++        return index
++    return {"video_index": selected_index("video"), "audio_index": selected_index("audio")}
+ 
+ 
+ def _frames_to_clock(frames: int, fps: float) -> str:
+@@ -453,6 +502,7 @@ class ProjectDocument:
+         video = ET.SubElement(root, "playlist", {"id": "playlist_v1"})
+         _set_property(video, "shotcut:video", 1)
+         _set_property(video, "shotcut:name", "V1")
++        _set_property(video, EMPTY_TRACK_PROPERTY, 1)
+         ET.SubElement(video, "blank", {"length": "1"})
+         main = ET.SubElement(root, "tractor", {"id": "tractor0", "in": "0", "out": "0"})
+         _set_property(main, "shotcut", 1)
+@@ -889,6 +939,11 @@ class ProjectDocument:
+     def replace_sequence(
+         self, playlist: ET.Element, sequence: list[ET.Element]
+     ) -> None:
++        if sequence:
++            _remove_property(playlist, EMPTY_TRACK_PROPERTY)
++        else:
++            sequence = [ET.Element("blank", {"length": "1"})]
++            _set_property(playlist, EMPTY_TRACK_PROPERTY, 1)
+         indices = [
+             index for index, child in enumerate(playlist) if child.tag in SEQUENCE_TAGS
+         ]
+@@ -928,7 +983,7 @@ class ProjectDocument:
+                 result[-1].set("length", str(self.item_duration(result[-1]) + duration))
+             else:
+                 result.append(item)
+-        return result or [ET.Element("blank", {"length": "1"})]
++        return result
+ 
+     def is_transition(self, entry: ET.Element) -> bool:
+         if entry.tag != "entry":
+@@ -976,13 +1031,13 @@ class ProjectDocument:
+     ) -> None:
+         sequence = self.sequence(playlist)
+         if (
+-            position is None
++            _property(playlist, EMPTY_TRACK_PROPERTY) == "1"
+             and len(sequence) == 1
+             and sequence[0].tag == "blank"
+             and self.item_duration(sequence[0]) == 1
+         ):
+-            # Shotcut represents a new/emptied track with one technical blank frame.
+-            # Treat that sentinel as an empty timeline when appending the first item.
++            # Only our marked technical sentinel is empty. An unmarked one-frame
++            # gap may be intentional, including when appending the first item.
+             sequence = []
+         total = sum(self.item_duration(node) for node in sequence)
+         frame = total if position is None else position
+@@ -1203,6 +1258,7 @@ class ProjectDocument:
+         playlist = ET.Element("playlist", {"id": playlist_id})
+         _set_property(playlist, f"shotcut:{kind}", 1)
+         _set_property(playlist, "shotcut:name", name)
++        _set_property(playlist, EMPTY_TRACK_PROPERTY, 1)
+         if kind == "audio":
+             _set_property(playlist, "hide", 1)
+         ET.SubElement(playlist, "blank", {"length": "1"})
+@@ -1363,8 +1419,15 @@ class ProjectDocument:
+         if not media_path.is_file():
+             raise ToolError(f"Media not found: {media_path}")
+         probe = probe_media_raw(media_path)
+-        duration_seconds = media_duration(probe)
++        # FFprobe can report one frame's cadence as a JPEG/PNG duration.
++        # A still's timeline length comes from the edit, not that probe value.
++        duration_seconds = (
++            None
++            if _is_still_image(probe)
++            else media_duration(probe)
++        )
+         producer_service = _media_producer_service(probe, duration_seconds)
++        stream_indices = _media_stream_indices(probe) if producer_service == "avformat-novalidate" else {}
+         image_duration = _number(
+             operation.get("image_duration_seconds", 5.0), "image_duration_seconds", 0.04
+         )
+@@ -1404,6 +1467,8 @@ class ProjectDocument:
+         if producer_service == "avformat-novalidate":
+             _set_property(producer, "seekable", 1)
+             _set_property(producer, "shotcut:skipConvert", 1)
++            for name, value in stream_indices.items():
++                _set_property(producer, name, value)
+         entry = ET.Element(
+             "entry",
+             {"producer": producer_id, "in": str(frame_in), "out": str(frame_out)},
+@@ -1509,8 +1574,13 @@ class ProjectDocument:
+         if not media_path.is_file():
+             raise ToolError(f"Media not found: {media_path}")
+         payload = probe_media_raw(media_path)
+-        duration_seconds = media_duration(payload)
++        duration_seconds = (
++            None
++            if _is_still_image(payload)
++            else media_duration(payload)
++        )
+         producer_service = _media_producer_service(payload, duration_seconds)
++        stream_indices = _media_stream_indices(payload) if producer_service == "avformat-novalidate" else {}
+         full_frames = (
+             max(1, math.ceil(duration_seconds * self.fps))
+             if duration_seconds is not None
+@@ -1547,6 +1617,8 @@ class ProjectDocument:
+                 "vstream",
+             } or name.startswith("meta."):
+                 producer.remove(prop)
++        for name, value in stream_indices.items():
++            _set_property(producer, name, value)
+         return {
+             "replaced": True,
+             "producer_id": producer.get("id"),
+@@ -3191,16 +3263,21 @@ class ProjectDocument:
+                 "use the full path or allow_multiple=true."
+             )
+         normalized = str(new_path).replace("\\", "/")
+-        owners: dict[int, ET.Element] = {}
++        owners = {id(reference.owner): reference.owner for reference in matches}
++        media_services = {"avformat", "avformat-novalidate", "timewarp"}
++        stream_indices = (_media_stream_indices(probe_media_raw(new_path))
++                          if any(_property(owner, "mlt_service") in media_services for owner in owners.values()) else {})
++        digest = shotcut_file_hash(new_path)
+         for reference in matches:
+             reference.replace_path(normalized)
+-            owners[id(reference.owner)] = reference.owner
+-        digest = shotcut_file_hash(new_path)
+         for owner in owners.values():
+             _set_property(owner, "shotcut:hash", digest)
+             _set_property(owner, "shotcut:caption", new_path.name)
+             for name in ("audio_index", "video_index", "astream", "vstream"):
+                 _remove_property(owner, name)
++            if _property(owner, "mlt_service") in media_services:
++                for name, value in stream_indices.items():
++                    _set_property(owner, name, value)
+         return {
+             "relinked": len(matches),
+             "owners_updated": len(owners),
+diff --git a/tests/test_project_features.py b/tests/test_project_features.py
+index b676612fc3166f883c28385f2274324556c8d66d..0d3d5cfbe17f8853b7f1dab6b42e7114162ca584 100644
+--- a/tests/test_project_features.py
++++ b/tests/test_project_features.py
+@@ -345,7 +345,7 @@ class ProjectFeatureTests(unittest.TestCase):
+     def _media_patch() -> object:
+         return patch(
+             "shotcut_mcp.project_document.probe_media_raw",
+-            return_value={"format": {"duration": "10"}, "streams": []},
++            return_value={"format": {"duration": "10"}, "streams": [{"index": 0, "codec_type": "video", "codec_name": "h264"}]},
+         )
+ 
+     def test_new_projects_use_canonical_processing_mode_and_semantic_hdr(self) -> None:
+@@ -890,14 +890,14 @@ class ProjectFeatureTests(unittest.TestCase):
+ 
+     def test_still_images_use_qimage_across_creation_and_replacement(self) -> None:
+         def probe(path: Path) -> dict[str, object]:
+-            if path.suffix.lower() == ".png":
++            if path.suffix.lower() in {".png", ".jpeg"}:
+                 return {
+-                    "format": {},
+-                    "streams": [{"codec_type": "video", "codec_name": "png"}],
++                    "format": {"format_name": "image2", "duration": "0.04"},
++                    "streams": [{"codec_type": "video", "codec_name": "png", "nb_frames": "1"}],
+                 }
+             return {
+-                "format": {"duration": "10"},
+-                "streams": [{"codec_type": "video", "codec_name": "h264"}],
++                "format": {"format_name": "mov,mp4", "duration": "10"},
++                "streams": [{"index": 0, "codec_type": "video", "codec_name": "h264"}],
+             }
+ 
+         def producer_properties(path: Path, producer_id: str) -> dict[str, str]:
+@@ -917,7 +917,7 @@ class ProjectFeatureTests(unittest.TestCase):
+         ):
+             root = Path(directory)
+             video = root / "source.mp4"
+-            first_image = root / "first.png"
++            first_image = root / "first.jpeg"
+             second_image = root / "second.png"
+             for path in (video, first_image, second_image):
+                 path.write_bytes(path.name.encode())
+@@ -935,6 +935,7 @@ class ProjectFeatureTests(unittest.TestCase):
+                 }
+             )
+             item = created["project"]["tracks"][0]["items"][0]
++            self.assertEqual(item["duration_frames"], 60)
+             self.assertEqual(
+                 producer_properties(image_project, item["producer_id"])["mlt_service"],
+                 "qimage",
+@@ -1027,6 +1028,167 @@ class ProjectFeatureTests(unittest.TestCase):
+                 "qimage",
+             )
+ 
++    def test_probed_media_type_is_preserved_when_names_disagree(self) -> None:
++        cases = [
++            ("movie.jpeg", "mov,mp4", "h264", "3", "90", "avformat-novalidate", 90),
++            ("still.mp4", "jpeg_pipe", "mjpeg", "0.04", "1", "qimage", 150),
++            ("motion.avi", "avi", "mjpeg", "3", "90", "avformat-novalidate", 90),
++            ("frames.png", "image2", "png", "0.08", "2", "avformat-novalidate", 3),
++        ]
++        for name, format_name, codec, duration, frames, service, expected_frames in cases:
++            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
++                media = Path(directory) / name
++                media.write_bytes(b"media fixture")
++                payload = {
++                    "format": {"format_name": format_name, "duration": duration},
++                    "streams": [{"index": 0, "codec_type": "video", "codec_name": codec, "nb_frames": frames}],
++                }
++                with patch("shotcut_mcp.project_document.probe_media_raw", return_value=payload):
++                    document = ProjectDocument.new(Path(directory) / "type.mlt", width=1920, height=1080, fps_num=30, fps_den=1, title="Fixture")
++                    producer, entry = document.create_media_producer({"path": str(media)})
++                    properties = {node.get("name"): node.text for node in producer.findall("property")}
++                    self.assertEqual(properties["mlt_service"], service)
++                    self.assertEqual(document.item_duration(entry), expected_frames)
++
++    def test_durationless_movies_fail_creation_and_replacement_without_changes(self) -> None:
++        with tempfile.TemporaryDirectory() as directory, self._media_patch():
++            root = Path(directory)
++            source = root / "source.mp4"
++            source.touch()
++            document = ProjectDocument.new(root / "sequence.mlt", width=1920, height=1080, fps_num=30, fps_den=1, title="Fixture")
++            document.add_clip({"path": str(source), "track": "V1"})
++            for name in ("untimed.mov", "untimed.jpeg"):
++                media = root / name
++                media.touch()
++                payload = {"format": {"format_name": "mov,mp4"},
++                           "streams": [{"codec_type": "video", "codec_name": "h264"}]}
++                before = document.to_bytes()
++                with self.subTest(name=name), patch("shotcut_mcp.project_document.probe_media_raw", return_value=payload):
++                    with self.assertRaisesRegex(ToolError, "readable timing metadata"):
++                        document.create_media_producer({"path": str(media)})
++                    with self.assertRaisesRegex(ToolError, "readable timing metadata"):
++                        document.replace_item_media({"path": str(media), "track": "V1", "item_index": 0})
++                self.assertEqual(document.to_bytes(), before)
++
++    def test_still_evidence_excludes_audio_cover_art_and_multiple_frames(self) -> None:
++        from shotcut_mcp.project_document import _media_producer_service
++
++        image = {"format": {"format_name": "image2", "duration": "0.04"},
++                 "streams": [{"codec_type": "video", "codec_name": "mjpeg", "nb_frames": "1"}]}
++        self.assertEqual(_media_producer_service(image, 0.04), "qimage")
++        for streams in ([],
++                        [{"codec_type": "video", "codec_name": "mjpeg", "nb_frames": "2"}],
++                        [{"codec_type": "video", "codec_name": "hevc"}],
++                        [{"codec_type": "video", "codec_name": "mjpeg", "disposition": {"attached_pic": 1}},
++                         {"codec_type": "audio", "codec_name": "aac"}],
++                        [{"codec_type": "video", "codec_name": "mjpeg"},
++                         {"codec_type": "video", "codec_name": "mjpeg"}]):
++            with self.subTest(streams=streams):
++                payload = {**image, "streams": streams}
++                with self.assertRaisesRegex(ToolError, "readable timing metadata"):
++                    _media_producer_service(payload, None)
++        for duration in (float("nan"), float("inf"), 0, -1):
++            payload = {"format": {"format_name": "mov"}, "streams": [{"codec_type": "video", "codec_name": "h264"}]}
++            with self.subTest(duration=duration), self.assertRaisesRegex(ToolError, "readable timing metadata"):
++                _media_producer_service(payload, duration)
++
++    def test_audio_first_movie_streams_survive_creation_replacement_and_relink(self) -> None:
++        def payload(video_index: int, audio_index: int) -> dict[str, object]:
++            return {"format": {"format_name": "mov,mp4", "duration": "4"}, "streams": [
++                {"index": audio_index, "codec_type": "audio", "codec_name": "aac", "disposition": {"default": 1}},
++                {"index": video_index, "codec_type": "video", "codec_name": "h264", "disposition": {"default": 1}},
++                {"index": 8, "codec_type": "data"}]}
++        def properties(document: ProjectDocument) -> dict[str, str]:
++            entry = next(document.find_track("V1").playlist.iter("entry"))
++            producer = document.id_map()[entry.get("producer")]
++            return {node.get("name"): node.text for node in producer.findall("property")}
++        with tempfile.TemporaryDirectory() as directory:
++            root = Path(directory).resolve()
++            paths = [root / (name + ".mp4") for name in ("first", "replacement", "relinked", "warped")]
++            for path in paths: path.touch()
++            probes = {paths[0]: payload(1, 0), paths[1]: payload(0, 2), paths[2]: payload(1, 0), paths[3]: payload(3, 1)}
++            with patch("shotcut_mcp.project_document.probe_media_raw", side_effect=lambda path: probes[path]):
++                document = ProjectDocument.new(root / "streams.mlt", width=640, height=360, fps_num=30, fps_den=1, title="Fixture")
++                document.add_clip({"path": str(paths[0]), "track": "V1"})
++                self.assertEqual((properties(document)["video_index"], properties(document)["audio_index"]), ("1", "0"))
++                for node in document.root.findall("producer"):
++                    if any(prop.get("name") == "resource" and prop.text == str(paths[0]) for prop in node.findall("property")):
++                        ET.SubElement(node, "property", {"name": "vstream"}).text = "7"
++                        ET.SubElement(node, "property", {"name": "astream"}).text = "8"
++                document.replace_item_media({"path": str(paths[1]), "track": "V1", "item_index": 0})
++                result = properties(document)
++                self.assertEqual((result["video_index"], result["audio_index"]), ("0", "2"))
++                self.assertNotIn("vstream", result)
++                self.assertNotIn("astream", result)
++                document.relink_media({"from": str(paths[1]), "to": str(paths[2])})
++                result = properties(document)
++                self.assertEqual((result["video_index"], result["audio_index"]), ("1", "0"))
++                document.set_clip_speed({"track": "V1", "item_index": 0, "speed": 2})
++                document.relink_media({"from": str(paths[2]), "to": str(paths[3]), "allow_multiple": True})
++                result = properties(document)
++                self.assertEqual((result["video_index"], result["audio_index"]), ("3", "1"))
++                self.assertEqual(result["mlt_service"], "timewarp")
++                self.assertTrue(result["resource"].endswith(str(paths[3])))
++
++    def test_decoder_stream_selection_uses_defaults_and_disables_artwork(self) -> None:
++        from shotcut_mcp.project_document import _media_stream_indices
++
++        probes = [
++            ({"streams": [{"index": 0, "codec_type": "video", "disposition": {"attached_pic": 1}},
++                          {"index": 1, "codec_type": "audio"}]}, {"video_index": -1, "audio_index": 1}),
++            ({"streams": [{"index": 0, "codec_type": "video"},
++                          {"index": 3, "codec_type": "video", "disposition": {"default": 1}},
++                          {"index": 1, "codec_type": "audio"},
++                          {"index": 4, "codec_type": "audio", "disposition": {"default": 1}}]},
++             {"video_index": 3, "audio_index": 4}),
++            ({"streams": [{"index": 2, "codec_type": "video"}]}, {"video_index": 2, "audio_index": -1}),
++        ]
++        for probe, expected in probes:
++            with self.subTest(probe=probe):self.assertEqual(_media_stream_indices(probe), expected)
++        with self.assertRaisesRegex(ToolError, "absolute index"):
++            _media_stream_indices({"streams": [{"codec_type": "video"}]})
++        with self.assertRaisesRegex(ToolError, "no readable streams"):
++            _media_stream_indices({"streams": []})
++
++    def test_initial_and_emptied_track_placeholders_do_not_add_a_tail_frame(self) -> None:
++        with tempfile.TemporaryDirectory() as directory, self._media_patch():
++            root = Path(directory).resolve()
++            media = root / "clip.mp4"; media.touch()
++            for position in (0, 10):
++                with self.subTest(position=position):
++                    document = ProjectDocument.new(root / "exact.mlt", width=640, height=360, fps_num=30, fps_den=1, title="Fixture")
++                    document.add_clip({"path": str(media), "track": "V1", "position_frame": position, "out_frame": 29})
++                    items = document.sequence(document.find_track("V1").playlist)
++                    self.assertEqual(sum(document.item_duration(item) for item in items), position + 30)
++                    self.assertEqual(items[-1].tag, "entry")
++            document = ProjectDocument.new(root / "empty.mlt", width=640, height=360, fps_num=30, fps_den=1, title="Fixture")
++            document.add_clip({"path": str(media), "track": "V1", "position_frame": 0, "out_frame": 29})
++            document.remove_item({"track": "V1", "item_index": 0, "ripple": True})
++            document.add_clip({"path": str(media), "track": "V1", "position_frame": 0, "out_frame": 29})
++            self.assertEqual(sum(document.item_duration(item) for item in document.sequence(document.find_track("V1").playlist)), 30)
++            document.add_track({"kind": "video", "name": "V2"})
++            document.add_clip({"path": str(media), "track": "V2", "position_frame": 0, "out_frame": 29})
++            self.assertEqual(sum(document.item_duration(item) for item in document.sequence(document.find_track("V2").playlist)), 30)
++
++    def test_intentional_and_legacy_one_frame_gaps_are_preserved(self) -> None:
++        with tempfile.TemporaryDirectory() as directory, self._media_patch():
++            root = Path(directory).resolve()
++            media = root / "clip.mp4"; media.touch()
++            for legacy in (False, True):
++                with self.subTest(legacy=legacy):
++                    document = ProjectDocument.new(root / "gap.mlt", width=640, height=360, fps_num=30, fps_den=1, title="Fixture")
++                    track = document.find_track("V1")
++                    if legacy:
++                        for prop in list(track.playlist.findall("property")):
++                            if prop.get("name") == "shotcut:mcpEmptyTrack": track.playlist.remove(prop)
++                    else:
++                        document.insert_gap({"tracks": ["V1"], "position_frame": 0, "duration_frames": 1})
++                    document.add_clip({"path": str(media), "track": "V1", "out_frame": 29})
++                    items = document.sequence(track.playlist)
++                    self.assertEqual(items[0].tag, "blank")
++                    self.assertEqual(document.item_duration(items[0]), 1)
++                    self.assertEqual(sum(document.item_duration(item) for item in items), 31)
++
+     def test_set_clip_opacity_reuses_one_owned_filter(self) -> None:
+         with tempfile.TemporaryDirectory() as directory:
+             project_path = Path(directory) / "opacity.mlt"
+diff --git a/tests/test_transactions.py b/tests/test_transactions.py
+index ad239e61a96c2d756084f46f88fe4d6463446a75..713c46120a0015734fd6c1d2eb1d52e2c92fb4c9 100644
+--- a/tests/test_transactions.py
++++ b/tests/test_transactions.py
+@@ -128,7 +128,7 @@ class ProjectTransactionTests(unittest.TestCase):
+ 
+             def probe(_path: Path) -> dict[str, object]:
+                 path.write_bytes(external)
+-                return {"format": {"duration": "10"}, "streams": []}
++                return {"format": {"duration": "10"}, "streams": [{"index": 0, "codec_type": "video", "codec_name": "h264"}]}
+ 
+             with (
+                 patch(

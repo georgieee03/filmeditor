@@ -2,7 +2,7 @@
 
 FilmEditor is an independent integration, not affiliated with Shotcut, HeyGen, GreenSock, Python Software Foundation, or OpenAI. Its MIT license covers original FilmEditor code only.
 
-No third-party source or binary is checked into this repository. The native app build copies a relocatable CPython runtime from the selected standalone prefix and pinned adapter/rendering dependencies from ignored `.deps/` directories into the local `.app` bundle. Shotcut/MLT, FFmpeg, Node.js, Chrome, and Codex remain installed separately. Third-party components retain their own licenses.
+The repository includes focused patches against the MIT-licensed Shotcut MCP adapter, with its copyright and license retained in [patches/SHOTCUT_MCP_LICENSE.txt](patches/SHOTCUT_MCP_LICENSE.txt). Full dependency checkouts and binaries are excluded. The native app build copies a relocatable CPython runtime from the selected standalone prefix and pinned adapter/rendering dependencies from ignored `.deps/` directories into the local `.app` bundle. Shotcut/MLT, FFmpeg, Node.js, Chrome, and Codex remain installed separately. Third-party components retain their own licenses.
 
 | Component | Selected reference | License/source |
 | --- | --- | --- |

@@ -12,11 +12,22 @@ import shutil
 import subprocess
 import sys
 import tempfile
+try:
+    from .managed_shotcut import verify_bridge,verify_bundle_bridge
+except ImportError:
+    from managed_shotcut import verify_bridge,verify_bundle_bridge
 
 ROOT=Path(__file__).resolve().parents[1]
 
 def command(args, **kwargs):
     return subprocess.run([str(a) for a in args],check=True,**kwargs)
+
+def unregister_app(registry, app):
+    # LaunchServices returns nonzero for a bundle that has no registration.
+    # This cleanup is advisory; registering the final installed app is required.
+    result=subprocess.run([str(registry),'-u',str(app)],capture_output=True,text=True)
+    if result.returncode:
+        print('LaunchServices cleanup returned '+str(result.returncode)+' for '+str(app)+'; continuing to register the installed app.')
 
 def local_environment():
     values={}
@@ -74,6 +85,7 @@ def main():
     }
     require('/Applications/Shotcut.app/Contents/MacOS/melt','Shotcut MLT')
     require(ROOT/'.deps/shotcut-mcp/scripts/shotcut_mcp_server.py','Pinned Shotcut adapter (run scripts/bootstrap.py)')
+    adapter_manifest=verify_bridge(ROOT/'.deps/shotcut-mcp')
     require(ROOT/'.deps/hyperframes/node_modules/.bin/hyperframes','Pinned HyperFrames (run scripts/bootstrap.py)')
     python=env.get('FILM_PYTHON') or (str(ROOT/'.venv/bin/python') if (ROOT/'.venv/bin/python').exists() else sys.executable)
     prefix=args.python_prefix or Path(command([python,'-c','import sys;print(sys.base_prefix)'],capture_output=True,text=True).stdout.strip())
@@ -86,9 +98,13 @@ def main():
     try:
         sdk=command(['/usr/bin/xcrun','--show-sdk-path'],capture_output=True,text=True).stdout.strip()
         machine=os.uname().machine
-        command(['/usr/bin/xcrun','swiftc',ROOT/'native/FilmEditor.swift','-o',executable,'-O',
+        command(['/usr/bin/xcrun','swiftc',ROOT/'native/main.swift',ROOT/'native/FilmEditor.swift',ROOT/'native/MediaImport.swift','-o',executable,'-O',
                  '-sdk',sdk,'-target',machine+'-apple-macos13.0','-framework','AppKit',
-                 '-framework','WebKit','-framework','UniformTypeIdentifiers'])
+                 '-framework','WebKit','-framework','UniformTypeIdentifiers','-framework','PhotosUI'])
+        vision_helper=resources/'FilmVision'
+        command(['/usr/bin/xcrun','swiftc',ROOT/'native/VisionReframe.swift','-o',vision_helper,'-O',
+                 '-sdk',sdk,'-target',machine+'-apple-macos13.0','-framework','AVFoundation','-framework','Vision'])
+        engine['FILM_VISION_HELPER']='@resources/FilmVision'
         iconset=staging/'FilmEditor.iconset'
         command(['/usr/bin/xcrun','swift',ROOT/'native/MakeIcon.swift',iconset])
         command(['/usr/bin/iconutil','--convert','icns','--output',resources/'FilmEditor.icns',iconset])
@@ -99,6 +115,8 @@ def main():
         deps=source/'.deps'; deps.mkdir()
         shutil.copytree(ROOT/'.deps/shotcut-mcp',deps/'shotcut-mcp',symlinks=True,
                         ignore=shutil.ignore_patterns('.git','__pycache__','*.pyc','.pytest_cache','tests','reports'))
+        adapter_proof=verify_bundle_bridge(deps/'shotcut-mcp',adapter_manifest)
+        (resources/'shotcut-adapter.json').write_text(json.dumps(adapter_proof,indent=2)+'\n')
         shutil.copytree(ROOT/'.deps/hyperframes',deps/'hyperframes',symlinks=True,
                         ignore=shutil.ignore_patterns('__pycache__','*.pyc','.cache'))
         local=source/'.local'; local.mkdir()
@@ -140,16 +158,16 @@ def main():
             installed=Path.home()/'Applications/FilmEditor.app'; installed.parent.mkdir(exist_ok=True)
             registry=Path('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister')
             if installed.exists():
-                if registry.exists(): command([registry,'-u',installed],capture_output=True,text=True)
+                if registry.exists(): unregister_app(registry,installed)
                 backup=installed.with_name('FilmEditor.previous.app')
                 if backup.exists(): shutil.rmtree(backup)
                 installed.rename(backup)
-                if registry.exists(): command([registry,'-u',backup],capture_output=True,text=True)
+                if registry.exists(): unregister_app(registry,backup)
             shutil.copytree(output,installed,symlinks=True)
             if registry.exists():
                 # A tested build and a retained legacy launcher can otherwise win
                 # name-based resolution ahead of the newly installed desktop app.
-                command([registry,'-u',output],capture_output=True,text=True)
+                unregister_app(registry,output)
                 command([registry,'-f',installed],capture_output=True,text=True)
             print('Installed '+str(installed))
         print('This app bundles Python, the UI and adapters. Shotcut, Node, Chrome and authenticated Codex remain installed engines.')

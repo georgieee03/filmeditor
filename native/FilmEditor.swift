@@ -155,7 +155,7 @@ final class LocalScheme: NSObject, WKURLSchemeHandler {
         }
         let files = ["/": "index.html", "/index.html": "index.html", "/app.js": "app.js",
                      "/desktop.js": "desktop.js", "/style.css": "style.css", "/music.js": "music.js",
-                     "/music.css": "music.css", "/advanced.js": "advanced.js", "/advanced.css": "advanced.css", "/quickstart.js": "quickstart.js", "/quickstart.css": "quickstart.css", "/assistant.js": "assistant.js", "/assistant.css": "assistant.css"]
+                     "/music.css": "music.css", "/advanced.js": "advanced.js", "/advanced.css": "advanced.css", "/quickstart.js": "quickstart.js", "/quickstart.css": "quickstart.css", "/assistant.js": "assistant.js", "/assistant.css": "assistant.css", "/enhance.js": "enhance.js", "/enhance.css": "enhance.css"]
         guard let name = files[url.path] else { fail(task, NativeFailure(message: "Resource not found.")); return }
         do {
             let file = resources.appendingPathComponent("app/web/" + name)
@@ -232,18 +232,31 @@ final class LocalScheme: NSObject, WKURLSchemeHandler {
 
 final class NativeWebView: WKWebView {
     var onFilesDropped: (([URL], CGPoint) -> Void)?
+    var onPromisesDropped: (([NSFilePromiseReceiver], CGPoint) -> Void)?
+    var onUnsupportedDrop: (() -> Void)?
+    private func promises(_ sender: NSDraggingInfo) -> [NSFilePromiseReceiver] {
+        sender.draggingPasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver] ?? []
+    }
     private func fileURLs(_ sender: NSDraggingInfo) -> [URL] {
         sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if !fileURLs(sender).isEmpty { return .copy }
+        if !promises(sender).isEmpty || !fileURLs(sender).isEmpty { return .copy }
         return super.draggingEntered(sender)
     }
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let point = convert(sender.draggingLocation, from: nil)
+        let location = CGPoint(x: point.x, y: isFlipped ? point.y : bounds.height - point.y)
+        // Photos can advertise a JPEG poster alongside its promised movie.
+        // Receive the file promise before considering any URL or WebKit fallback.
+        let promised = promises(sender)
+        if !promised.isEmpty { onPromisesDropped?(promised, location); return true }
         let urls = fileURLs(sender)
         if !urls.isEmpty {
-            let point = convert(sender.draggingLocation, from: nil)
-            onFilesDropped?(urls, CGPoint(x: point.x, y: isFlipped ? point.y : bounds.height - point.y)); return true
+            onFilesDropped?(urls, location); return true
+        }
+        if sender.draggingSource == nil {
+            onUnsupportedDrop?(); return false
         }
         return super.performDragOperation(sender)
     }
@@ -264,6 +277,8 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     var smokeExit = false
     var launchErrors: [String] = []
     var navigationGeneration = 0
+    var photosPicker: PhotosMediaPicker?
+    var importDirectories: [URL: NativeImportCancellation] = [:]
     var currentProject: String {
         URLComponents(url: webView.url ?? URL(string: "filmapp://app/")!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "project" })?.value ?? "legacy"
     }
@@ -289,8 +304,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         configuration.setURLSchemeHandler(scheme, forURLScheme: "filmapp")
         webView = NativeWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self; webView.uiDelegate = self
-        webView.registerForDraggedTypes([.fileURL])
+        webView.registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) })
         webView.onFilesDropped = { [weak self] urls, point in self?.importURLs(urls, point: point) }
+        webView.onPromisesDropped = { [weak self] receivers, point in self?.importPromises(receivers, point: point) }
+        webView.onUnsupportedDrop = { [weak self] in self?.showError("This drag supplied a preview rather than a media file. In Photos, choose File > Export > Export Unmodified Original, then import the exported movie into FilmEditor.") }
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1320, height: 850),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "FilmEditor"; window.minSize = NSSize(width: 980, height: 640)
@@ -338,6 +355,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             backend.request(project: senderProject, body: body, route: route) { [weak self] in self?.resolve(id, $0) }
         case "importDialog": importDialog(id: id, kind: body["kind"] as? String ?? "footage", project: senderProject)
+        case "photosDialog": importPhotos(id: id, kind: body["kind"] as? String ?? "footage", project: senderProject)
         case "upload": backend.request(operation: "upload", project: senderProject, body: body) { [weak self] in self?.resolve(id, $0) }
         case "cancelUploads": backend.request(operation: "cancelUploads", project: senderProject) { [weak self] in self?.resolve(id, $0) }
         case "saveMedia": saveMedia(id: id, body: body)
@@ -360,12 +378,97 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
         let extensions = ["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "mxf", "wav", "mp3", "m4a", "flac", "aac", "ogg", "opus", "aif", "aiff", "wma", "alac", "png", "jpg", "jpeg", "webp", "heic", "heif", "cube", "srt", "vtt"]
         panel.allowedContentTypes = extensions.compactMap { UTType(filenameExtension: $0) }
+        let photos = NSButton(title: "Choose from Photos…", target: self, action: #selector(choosePhotosFromOpenPanel(_:)))
+        panel.accessoryView = photos
+        panel.isAccessoryViewDisclosed = true
+        photos.identifier = NSUserInterfaceItemIdentifier(id)
+        photos.toolTip = "Select videos and pictures directly from your Photos library"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self else { return }
+            if response == .continue { self.importPhotos(id: id, kind: kind, project: project); return }
             if response != .OK { self.resolve(id, .success([])); return }
             self.backend.request(operation: "import", project: project,
                                  body: ["paths": panel.urls.map(\.path), "kind": kind]) { self.resolve(id, $0) }
         }
+    }
+
+    @objc private func choosePhotosFromOpenPanel(_ sender: NSButton) {
+        guard let panel = sender.window as? NSOpenPanel else { return }
+        panel.orderOut(nil); window.endSheet(panel, returnCode: .continue)
+    }
+
+    private func importStatus(_ message: String, busy: Bool) {
+        guard let data = try? JSONSerialization.data(withJSONObject: ["message": message, "busy": busy]),
+              let literal = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('filmeditor-native-import-status',{detail:" + literal + "}))", completionHandler: nil)
+    }
+
+    private func importPhotos(id: String? = nil, kind: String = "footage", project: String? = nil) {
+        guard webView.url?.query?.contains("project=") == true else { showError("Open a project before importing media."); return }
+        guard photosPicker == nil else { return }
+        let project = project ?? currentProject, generation = navigationGeneration
+        photosPicker = PhotosMediaPicker(parent: window) { [weak self] providers in
+            guard let self else { return }; self.photosPicker = nil
+            if providers.isEmpty { if let id { self.resolve(id, .success([])) }; return }
+            self.receiveMedia(project: project, generation: generation, kind: kind, id: id, point: nil,
+                              message: "Receiving \(providers.count) selected files from Photos…") { directory, cancellation, done in
+                NativeMediaFiles.receiveProviders(providers, into: directory, cancellation: cancellation, completion: done)
+            }
+        }
+        photosPicker?.present()
+    }
+
+    private func importPromises(_ receivers: [NSFilePromiseReceiver], point: CGPoint) {
+        guard webView.url?.query?.contains("project=") == true else { showError("Open a project before importing media."); return }
+        let project = currentProject, generation = navigationGeneration
+        webView.evaluateJavaScript("document.getElementById('import-kind')?.value || 'footage'") { [weak self] kind, _ in
+            self?.receiveMedia(project: project, generation: generation, kind: kind as? String ?? "footage", id: nil, point: point,
+                               message: "Receiving \(receivers.count) files from Photos or another app…") { directory, _, done in
+                NativeMediaFiles.receivePromises(receivers, into: directory, completion: done)
+            }
+        }
+    }
+
+    private func receiveMedia(project: String, generation: Int, kind: String, id: String?, point: CGPoint?, message: String,
+                              receive: (URL, NativeImportCancellation, @escaping (Result<[URL], Error>) -> Void) -> Void) {
+        guard !terminating, generation == navigationGeneration, project == currentProject else { return }
+        do {
+            let directory = try NativeMediaFiles.stagingDirectory(), cancellation = NativeImportCancellation()
+            importDirectories[directory] = cancellation
+            importStatus(message, busy: true)
+            receive(directory, cancellation) { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self else { try? FileManager.default.removeItem(at: directory); return }
+                    func clean() { try? FileManager.default.removeItem(at: directory); self.importDirectories.removeValue(forKey: directory) }
+                    guard !self.terminating, !cancellation.isCancelled, generation == self.navigationGeneration, project == self.currentProject else { clean(); return }
+                    do {
+                        let urls = try result.get()
+                        guard urls.count <= 200 else { throw NativeFailure(message: "Import up to 200 files at a time.") }
+                        self.importStatus("Importing \(urls.count) media files…", busy: true)
+                        self.backend.request(operation: "import", project: project, body: ["paths": urls.map(\.path), "kind": kind]) { result in
+                            defer { clean() }
+                            guard !self.terminating, generation == self.navigationGeneration, project == self.currentProject else { return }
+                            self.importStatus("", busy: false)
+                            if let id { self.resolve(id, result) }
+                            else {
+                                do { self.dispatchImported(try result.get(), point: point) }
+                                catch { self.showError(error.localizedDescription) }
+                            }
+                        }
+                    } catch {
+                        clean(); self.importStatus("", busy: false)
+                        if let id { self.resolve(id, .failure(error)) } else { self.showError(error.localizedDescription) }
+                    }
+                }
+            }
+        } catch { if let id { resolve(id, .failure(error)) } else { showError(error.localizedDescription) } }
+    }
+
+    private func dispatchImported(_ assets: Any, point: CGPoint?) {
+        var detail: [String: Any] = ["assets": assets]
+        if let point { detail["x"] = point.x; detail["y"] = point.y }
+        guard let data = try? JSONSerialization.data(withJSONObject: detail), let literal = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('filmeditor-native-drop',{detail:" + literal + "}))", completionHandler: nil)
     }
 
     private func importURLs(_ urls: [URL], point: CGPoint) {
@@ -379,10 +482,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 do {
                     let assets = try result.get()
                     guard self.navigationGeneration == generation, self.currentProject == project else { return }
-                    let detail: [String: Any] = ["assets": assets, "x": point.x, "y": point.y]
-                    let data = try JSONSerialization.data(withJSONObject: detail)
-                    let literal = String(data: data, encoding: .utf8)!
-                    self.webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('filmeditor-native-drop',{detail:" + literal + "}))", completionHandler: nil)
+                    self.dispatchImported(assets, point: point)
                 } catch { self.showError(error.localizedDescription) }
             }
         }
@@ -438,7 +538,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
         } catch { finishSmoke(["passed": false, "error": error.localizedDescription]) }
     }
-    func webView(_ view: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { navigationGeneration += 1 }
+    func webView(_ view: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        navigationGeneration += 1
+        for cancellation in importDirectories.values { cancellation.cancel() }
+    }
     func webView(_ view: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { launchErrors.append(error.localizedDescription) }
 
     func finishSmoke(_ value: [String: Any]) {
@@ -471,6 +574,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     @objc func clickMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
         if identifier == "workspace" { webView.evaluateJavaScript("window.FilmDesktop.revealWorkspace()", completionHandler: nil) }
+        else if identifier == "photos" { importPhotos() }
         else if identifier == "library" { webView.load(URLRequest(url: URL(string: "filmapp://app/")!)) }
         else {
             let data = try! JSONSerialization.data(withJSONObject: [identifier])
@@ -494,6 +598,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
         group("File", [("Projects…", "o", "library"), ("New Project…", "n", "create-project"),
                        ("Import Media…", "i", "import-top"), ("Export Timeline…", "e", "export-top"),
+                       ("Import from Photos…", "", "photos"),
                        ("Show Workspace in Finder", "", "workspace")])
         group("Edit", [("Undo", "z", "undo"), ("Redo", "Z", "redo"), ("Split Clip at Playhead", "k", "split"),
                        ("Duplicate Clip", "d", "duplicate"), ("Delete Selected Clip", "", "delete-clip")])
@@ -512,11 +617,15 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if terminating { return .terminateNow }
-        terminating = true; backend.shutdown()
+        terminating = true
+        for cancellation in importDirectories.values { cancellation.cancel() }
+        let directories = Array(importDirectories.keys)
+        backend.shutdown()
         DispatchQueue.global().async {
             let deadline = Date().addingTimeInterval(10)
             while self.backend.process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
             if self.backend.process.isRunning { self.backend.process.terminate() }
+            for directory in directories { try? FileManager.default.removeItem(at: directory) }
             DispatchQueue.main.async { NSApp.reply(toApplicationShouldTerminate: true) }
         }
         return .terminateLater
@@ -525,8 +634,3 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.makeKeyAndOrderFront(nil); return true
     }
 }
-
-let application = NSApplication.shared
-let delegate = Application()
-application.delegate = delegate
-application.run()

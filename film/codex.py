@@ -55,6 +55,19 @@ fit the music to the picture, with source offset, looping or trimming and overal
 existing picture and dialogue intact unless asked to change them. Beat markers and tempo are
 estimates, not a verified musical analysis. Render and review the resulting mix. Report the
 track title, creator, source and licence/credits; catalogue metadata is not clearance proof.
+For stabilization, subject-following portrait reframing or dialogue cleanup use film_enhance_start
+on an imported source, then poll film_enhance_status. These local jobs preserve the original and
+create full-length derived assets. The current limit is five minutes per source and verified
+8-bit SDR video; do not use an unverified HDR/Log conversion. Inspect job warnings and actual
+output frames/audio. Reframe uses on-device 2-D region tracking, not 3-D camera reconstruction;
+if automatic detection fails, choose a manual first-frame target based on image inspection.
+The completed result is not automatically placed on the timeline. Re-inspect the current
+project and use replace_item_media with the completed asset path and exact expected_revision
+for ordinary clips, retaining source in/out and other edits. Existing speed/proxy/transition
+clips may need a separate newly inserted derivative; report unsupported replacements clearly.
+Changing a landscape sequence into portrait changes all its framing. Only do so when the user's
+requested output calls for it; set_profile must preserve frame numbers and the original FPS.
+For both stabilization and reframe, stabilize first then track the stabilized derivative.
 Prefer editor tools for revision-safe timeline edits. The host's selected permission policy
 governs shell and filesystem access. In Full access, complete authorized work without approval
 prompts. Ask only for information that is actually missing. Do not manufacture approval gates.

@@ -18,6 +18,7 @@
   window.FilmDesktop = Object.freeze({
     api: (route, body) => request('api', {route, ...(body === undefined ? {} : {body})}),
     importFiles: kind => request('importDialog', {kind}),
+    importPhotos: kind => request('photosDialog', {kind}),
     saveMedia: (url, name) => request('saveMedia', {url, name}),
     revealWorkspace: () => request('revealWorkspace'),
     async uploadFiles(files, kind) {

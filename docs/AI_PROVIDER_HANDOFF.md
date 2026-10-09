@@ -99,6 +99,14 @@ Imported assets remain in the chosen project workspace. Media displayed by the n
 
 Normal MCP responses minimize metadata: `film_probe` returns the allowlisted `Ingest.classify` view, and `film_assets` omits cached raw metadata and its probe stamp. Treat that as response minimization, not a security boundary. In Full access, Codex can still use its shell and filesystem tools within the Mac user's reach. Provider adapters must preserve that authority disclosure and should not describe metadata filtering as media isolation.
 
+### Local enhancement jobs
+
+`film_enhance_start`, `film_enhance_status`, and `film_enhance_cancel` are provider-independent tools implemented in `film/enhance.py`. They create full-source derivatives for stabilization, reframing and audio cleanup, using an owned FFmpeg process and the native `FilmVision` helper for on-device region tracking. Jobs share the heavy-work limit, report warnings, and preserve imported originals. The first implementation limits sources to five minutes and requires supported SDR video geometry; unknown color or target evidence is not silently guessed.
+
+Completion returns a new asset ID; it does not change any timeline. Re-inspect the active sequence and use its current revision when inserting or replacing an ordinary clip with the result. Replacement retains source offsets, which is why derivatives cover the full source. Speed/proxy/adjacent-transition clips have explicit replacement limits. A sequence format change is a separate user-intent-dependent operation that must preserve the original frame rate. All mutations use the existing shared history path. Do not put geometry files or private source paths into a provider's system prompt; use the tool results and only inspect frames needed for the user's request.
+
+A Claude migration should retain the same job IDs, cancellation, tool schemas and undo contract. Only the model connection and its event/permission adapter should change. Review the new instruction paragraph in `film/codex.py` when translating the operator prompt. See [enhancement workflow](ENHANCEMENTS.md) and the latest [validation record](VALIDATION.md).
+
 ### Revision-safe timeline tools
 
 Codex is instructed to inspect the saved timeline first. `inspect_project` returns the current MLT path, revision, track/item references, and properties. `edit_project` must carry that exact `project_path` and `expected_revision` alongside its operation list. FilmEditor rejects a stale revision; it does not force an edit. The engine adapter serializes engine commits and calls a shared edit observer, so Codex/MCP edits enter the same undo history as manual timeline edits. The editor validates track locks and active project again on manual API edits, and manual undo/redo also carries the expected revision.

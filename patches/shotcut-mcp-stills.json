@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "commit": "f1b78d350a9992296f0b7f11a55c04819ea25730",
+  "patch": "shotcut-mcp-stills.patch",
+  "legacy_patch": "shotcut-mcp-stills-legacy.patch",
+  "files": {
+    "CHANGELOG.md": {
+      "clean": "2d366dcd102c00c7988e502b9b931cb551c9008442a3ce9d258fd30bc15b37ba",
+      "patched": "e6bb1138938a6887853c120420aae8e9132027abeb67e63000fea505c3157291",
+      "legacy": "d79c9214a73a4ebef64be667aee1542b569743dfed71c95135466d3b351237cc"
+    },
+    "shotcut_mcp/project_document.py": {
+      "clean": "04e5f211f1a5b945f8d81f214644c4b967801c10bb3b6b175d2cf3fff9a3c869",
+      "patched": "463bc85eb75e59eb0acb53bc996ab1c26d4eb9f416f31275c96847fdf7bd00fb",
+      "legacy": "11fa7c372fda70c99b266042946c732b32bde1f8c6ae574f2648c7d3aefd0f67"
+    },
+    "tests/test_project_features.py": {
+      "clean": "fa22660db2498e19f10b1a467eeedfa087a008d5906a12cf629af97e164e4149",
+      "patched": "8b196aa6c1e204dccbe9e53d19ec7568225800038e5aaa2f6cc8081d34ce3fde",
+      "legacy": "c9cdd29e4c97d5e4dbcb5214bc23169c501deb535463a8f82741d722af624b7f"
+    },
+    "tests/test_transactions.py": {
+      "clean": "d44487bdde229f7ce69c26ab715989a74b6a92f87a757bd2836c66c40d2eefaf",
+      "patched": "9fd0a12b6e3937bb5537ae94af6b6ae34672e3ef1f5384788462739c8cb20569",
+      "legacy": "d44487bdde229f7ce69c26ab715989a74b6a92f87a757bd2836c66c40d2eefaf"
+    }
+  },
+  "patch_sha256": "47d90593f76279746ab2d7a5b0873053f0b4722ece6cf8b37cc9152edec17dba",
+  "legacy_patch_sha256": "e4a284d0056f618289f73dba3eac4946c3729df4c92505eaf2ad8646a0cb2ea7"
+}

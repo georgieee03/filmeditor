@@ -13,6 +13,9 @@ Use a disposable project and short synthetic clips. Do not use or overwrite came
 ## 2. Native project and media flows
 
 - Create a project and sequence. Use File > Import to select a synthetic video and audio file. Confirm the native file panel closes and the imported media appears in the project bin.
+- Use the Photos bin button, File > Import from Photos, and the normal file panel's Choose from Photos button. Select multiple videos and verify their actual movie/audio streams, source playback, timeline placement, and rendered moving pictures. Repeat a direct drag from Photos. Never count a JPEG poster or a video element whose clock advances over a frozen image as success.
+- Select a source or timeline clip and open Enhance. Exercise stabilization, automatic/manual portrait crop and audio cleanup; inspect warnings, preview the separate result, apply with current revision, then undo. Explicit sequence-format matching must preserve FPS and frame counts. Check cancellation, preserved originals and cleanup of partial output. Use known jitter/noise/impulse fixtures to distinguish successful processing from actual quality improvement and audio alignment.
+- Verify a movie with audio at absolute stream 0 and video at stream 1 renders moving pictures, including after replacement/relink. Test in a disposable project; preserve the user's library and existing edits.
 - Drag a file from Finder into the app's import area. Confirm the media is copied into the project workspace and the source file hash remains unchanged.
 - Import a short synthetic 3840×2160 H.264 clip. Confirm its inspection proxy is 1280×720 and its source hash is unchanged. This verifies proxy generation only; it does not qualify sustained 4K or long-form performance.
 - Use the native File > Open/New flows and File > Show Workspace action. Quit and reopen the app; confirm the project library and saved sequence are available.
@@ -21,6 +24,7 @@ Use a disposable project and short synthetic clips. Do not use or overwrite came
 ## 3. Direct editing and render
 
 - Drag clips from the bin onto video and audio tracks. Move a clip, trim each edge, split at the playhead, change a track, and verify snapping.
+- JPEG/PNG stills use a five-second default duration even when FFprobe reports a single-frame duration such as 0.04 seconds. Verify both bin drag and source Insert/Append, and render a frame near the end of the still. This requires the tracked managed Shotcut MCP patch; test clean bootstrap and bundle hash verification.
 - Lock a track and confirm drag, trim, split, delete, inspector edits, and manual editor API calls cannot modify its clips. Unlock it and confirm editing works again. Separately test whether the installed engine applies its lock metadata to a Codex/MCP edit, and record the result. Verify vertical-only clip movement changes tracks without changing its time.
 - Duplicate and delete a selected clip. Use Undo and Redo to restore and reapply the edit. Save, quit, reopen, and confirm the timeline revision and clip positions persist.
 - Change brightness and saturation on a synthetic SDR clip, render a preview, and confirm the controls retain their values after reselecting the clip and reopening the project. Record which installed MLT services were available.
