@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "79f80cd16b7139e98371ca33a78275929ab4f4ca0722137967b8516f4725a506",
-      "bytes": 14559
+      "sha256": "0b95d34f2db2d78ac687f7b1d182c673df584e9a46f43871cb18e7c73aa7d361",
+      "bytes": 14247
     },
     {
       "path": "SECURITY.md",
@@ -58,8 +58,8 @@
     },
     {
       "path": "docs/AI_PROVIDER_HANDOFF.md",
-      "sha256": "a3ec9e431088cf9295a3bb6639121eb778a7e2df1a59e7436222cf40f2c13256",
-      "bytes": 35259
+      "sha256": "873588d11ef69f0c6442664eec117b4dbf5be8d5164bca75e3fd71d585ce40de",
+      "bytes": 37475
     },
     {
       "path": "docs/AUTO_DETECTION.md",
@@ -68,8 +68,8 @@
     },
     {
       "path": "docs/CONTEXT_HANDOFF.md",
-      "sha256": "eec50897d976f75707802f80b9679f3cedca63534538884ae4dd9c837330e1fc",
-      "bytes": 11581
+      "sha256": "fe004e6b32ed926ddcf0855897d65d1aac0d11d62f76bd2cb2c87c69eca4a9f4",
+      "bytes": 14129
     },
     {
       "path": "docs/ENHANCEMENTS.md",
@@ -85,6 +85,11 @@
       "path": "docs/MUSIC_RESEARCH.md",
       "sha256": "e950cca39e818e1d01be808c4f4e817e73a27943c4286bc3ada3f0495e896bcb",
       "bytes": 11011
+    },
+    {
+      "path": "docs/MUSIC_WORKFLOW_VALIDATION.md",
+      "sha256": "3eec3aa8a238b40b3f6f3eccb59e54df5d14b0e649799b24050dcca9436e1802",
+      "bytes": 9261
     },
     {
       "path": "docs/PHOTOS_IMPORT.md",
@@ -108,8 +113,8 @@
     },
     {
       "path": "docs/VALIDATION.md",
-      "sha256": "c2346f630dd7f5c65faba7017f841a921a99d9eda1e4049dc2bde985a6e19dc7",
-      "bytes": 28431
+      "sha256": "d03f463b18b550a4c564b972802f2e92131cc39947adcba1e93284c40b429baf",
+      "bytes": 32304
     },
     {
       "path": "docs/mac-handoff-tests.txt",
@@ -302,6 +307,16 @@
       "bytes": 5040
     },
     {
+      "path": "tests/music_output_analysis.py",
+      "sha256": "496dc6387a51cb87170eba50a669c7a7ed801c9c0dc97716592ada93616f4541",
+      "bytes": 51851
+    },
+    {
+      "path": "tests/music_visual_review.py",
+      "sha256": "d4215bab86e3c908255cca583d0dc486160f2429457daa8af2558a3fa88a57ae",
+      "bytes": 5838
+    },
+    {
       "path": "tests/native_acceptance.py",
       "sha256": "b70a152c255448fb82df01b0f99ceba743913d599c30abdd9b54fff36fb3a6e9",
       "bytes": 6107
@@ -345,6 +360,16 @@
       "path": "tests/native_multiclip_smoke.js",
       "sha256": "11a0b738010a1a26b9ad8182b105e4e8128f04d83a4ae65d33acc3166b5519ef",
       "bytes": 16995
+    },
+    {
+      "path": "tests/native_music_workflow.js",
+      "sha256": "04d94b1355085bdc857513984fa1526eb1d7cd034efb8bac4795c24977329a60",
+      "bytes": 16762
+    },
+    {
+      "path": "tests/native_music_workflow.py",
+      "sha256": "29e0830d698658d1b9902e428b94d30af78caed8d416733cd1f33ce865165d01",
+      "bytes": 44665
     },
     {
       "path": "tests/native_playback_acceptance.js",
@@ -470,6 +495,11 @@
       "path": "tests/test_music_review.py",
       "sha256": "e83eb8740327300b62f616f590a9c5b8d1918d688a0f74944e95b0d3e06c2626",
       "bytes": 17700
+    },
+    {
+      "path": "tests/test_music_workflow_evidence.py",
+      "sha256": "9ce7ab98a46d8ca06008c8acbb01f4dfd5c0fd8fed40b523af89080a17d606bd",
+      "bytes": 2373
     },
     {
       "path": "tests/test_output_publication.py",
