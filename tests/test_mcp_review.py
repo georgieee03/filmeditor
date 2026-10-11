@@ -79,7 +79,7 @@ class McpResponseReviewTests(unittest.TestCase):
         self.assertEqual(wire['result'],app.normalize_mcp_result(original))
         self.assertNotIn('annotations',wire['result']['content'][1])
         api.assert_called_once_with(Path('/fixture/workspace'),'/api/call',
-                                   {'name':'render_preview','arguments':{'frame':3}})
+                {'name':'render_preview','arguments':{'frame':3}},follow_selection=True)
 
 
 def live_parser():

@@ -83,7 +83,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             route=urlsplit(self.path); args=parse_qs(route.query)
-            if route.path in ('/','/app.js','/desktop.js','/music.js','/music.css','/advanced.js','/advanced.css','/quickstart.js','/quickstart.css','/assistant.js','/assistant.css','/enhance.js','/enhance.css','/style.css'):
+            if route.path in ('/','/app.js','/token-usage.js','/reference.js','/desktop.js','/music.js','/music.css','/advanced.js','/advanced.css','/quickstart.js','/quickstart.css','/assistant.js','/assistant.css','/enhance.js','/enhance.css','/style.css'):
                 self.guard(False); p=ROOT/'web'/('index.html' if route.path=='/' else route.path[1:]); raw=p.read_bytes()
                 self.send_headers(200,len(raw),mimetypes.guess_type(str(p))[0] or 'text/plain'); self.wfile.write(raw); return
             if route.path=='/media':

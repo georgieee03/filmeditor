@@ -20,6 +20,14 @@ Preserve the tool chain when implementing another provider: `film_assets` and me
 
 Two initial tool calls had invalid arguments (`progressive=true` where an integer is required, and a black-duration threshold below 0.05 seconds). Codex corrected both and completed the workflow; record these as recovered contract errors, not as a zero-error run. There were no approval events. Technical setup did raise an unresolved source sample-aspect question; the later explicit brief selected output geometry without pretending that the source metadata was known. See [MUSIC_WORKFLOW_VALIDATION.md](MUSIC_WORKFLOW_VALIDATION.md) for actual audio/cut measurements and reproducible acceptance commands.
 
+## Follow-up tool and host contracts — 2026-10-11
+
+The provider-neutral tools now include `film_music_cut_plan`, `film_reference_analyze`, `film_extract_audio` and `film_export_info`. The plan returns exact frame boundaries; a separate revision-safe edit authors them. Reference measurements return candidates, review images and bounded audio proximity, not exact transition reconstruction. Extraction creates an audio asset. Final `render_status` preserves engine status and may include `delivery_path` or `delivery_warning`; the host verifies an actual non-artwork video stream and publishes only completed exports to the named videos-only folder. Keep these contracts when adding another AI provider.
+
+`film/codex.py` handles `thread/tokenUsage/updated`, normalizes provided total/last counters, scopes them to the parent thread, persists the latest report and clears it on New chat. `web/token-usage.js` shows thread totals and latest reported model usage; `last` is not claimed to aggregate an entire user turn. Model context capacity is not subscription balance. A Claude adapter would need its own event normalization and accurate unavailable states. Claude remains unimplemented.
+
+The app's Codex MCP child now uses `--pin-project`. An external MCP connection to the library root follows the native selected project and must call `film_assets` after each switch; the backend binds that client to the selection epoch and rejects stale calls. Client IDs are independent; older local adapters use kernel Unix peer PID where supported. Home has no editing target. Native app navigation sets selection through trusted IPC. These two conversations share project files and revision history, not conversation history. See [BEATS_REFERENCE_EXPORTS.md](BEATS_REFERENCE_EXPORTS.md).
+
 ## Current data and request flow
 
 ```mermaid

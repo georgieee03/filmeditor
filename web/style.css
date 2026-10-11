@@ -224,3 +224,5 @@ pre{color:#cad2dc;background:#171a1d;border:1px solid #383f46;border-radius:5px;
   .clip{height:41px}
   .chat #messages{padding-top:8px}
 }
+
+#token-meter{padding:0 10px;flex:none}#token-meter:empty{display:none}#token-meter #codex-token-usage{margin:0 0 5px!important}.delivery-path{overflow-wrap:anywhere;color:var(--muted)}

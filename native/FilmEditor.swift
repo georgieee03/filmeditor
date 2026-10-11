@@ -154,7 +154,7 @@ final class LocalScheme: NSObject, WKURLSchemeHandler {
             return
         }
         let files = ["/": "index.html", "/index.html": "index.html", "/app.js": "app.js",
-                     "/desktop.js": "desktop.js", "/style.css": "style.css", "/music.js": "music.js",
+                     "/desktop.js": "desktop.js", "/token-usage.js": "token-usage.js", "/reference.js": "reference.js", "/style.css": "style.css", "/music.js": "music.js",
                      "/music.css": "music.css", "/advanced.js": "advanced.js", "/advanced.css": "advanced.css", "/quickstart.js": "quickstart.js", "/quickstart.css": "quickstart.css", "/assistant.js": "assistant.js", "/assistant.css": "assistant.css", "/enhance.js": "enhance.js", "/enhance.css": "enhance.css"]
         guard let name = files[url.path] else { fail(task, NativeFailure(message: "Resource not found.")); return }
         do {
@@ -672,6 +672,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
     func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
         window.title = view.title ?? "FilmEditor"
+        if ready, view.url?.scheme == "filmapp" {
+            let selected = URLComponents(url: view.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "project" })?.value
+            backend.request(operation: "selectProject", body: ["selected": selected as Any? ?? NSNull(), "sequence": navigationGeneration * 2 + 1]) { _ in }
+        }
         guard ready, !smokeStarted, let smokeScript, view.url?.scheme == "filmapp" else { return }
         smokeStarted = true
         do {
@@ -683,6 +687,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     }
     func webView(_ view: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         navigationGeneration += 1
+        if ready { backend.request(operation: "selectProject", body: ["selected": NSNull(), "sequence": navigationGeneration * 2]) { _ in } }
         for cancellation in importDirectories.values { cancellation.cancel() }
     }
     func webView(_ view: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { launchErrors.append(error.localizedDescription) }
@@ -701,6 +706,10 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 try? png.write(to: target.deletingPathExtension().appendingPathExtension("png"))
             }
             if let error { report["snapshotError"] = error.localizedDescription }
+            if !JSONSerialization.isValidJSONObject(report) {
+                report = ["passed": false, "native": true,
+                          "error": "Smoke report contains a non-JSON value; normalize nonfinite numbers before reporting."]
+            }
             if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: target, options: .atomic)
             }

@@ -12,6 +12,7 @@ from pathlib import Path
 import secrets
 import signal
 import socketserver
+import socket
 import sys
 import threading
 import time
@@ -30,6 +31,8 @@ class DesktopLibrary(Library):
             if not self.entry(ident): raise ValueError('Project not found or deleted')
             if ident not in self.sessions:
                 ws=Workspace(self.owner.workspace.root/'projects'/ident)
+                from .delivery import bind_workspace
+                bind_workspace(ws,self.owner.workspace.root,ident,self.entry(ident)['name'])
                 ws.heavy_slots=self.owner.workspace.heavy_slots
                 ws.render_peers=self.owner.workspace.render_peers
                 ws.render_peers.append(ws)
@@ -236,7 +239,17 @@ class UnixHandler(socketserver.StreamRequestHandler):
         if len(raw)>MAX_MESSAGE: return
         try:
             message=json.loads(raw)
-            value=self.server.desktop.dispatch(message, trusted=False)
+            peer_pid=None
+            if sys.platform=='darwin':
+                # Darwin sys/un.h: SOL_LOCAL=0, LOCAL_PEERPID=2. The kernel,
+                # not request JSON, identifies older adapters without client_id.
+                try: peer_pid=self.connection.getsockopt(0,2)
+                except OSError: pass
+            elif hasattr(socket,'SO_PEERCRED'):
+                import struct
+                try: peer_pid=struct.unpack('3i',self.connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))[0]
+                except OSError: pass
+            value=self.server.desktop.dispatch(message, trusted=False, peer_pid=peer_pid)
             reply={'result':value}
         except Exception as exc: reply={'error':str(exc)}
         try: self.wfile.write(json.dumps(reply,ensure_ascii=False).encode()+b'\n')
@@ -245,6 +258,11 @@ class UnixHandler(socketserver.StreamRequestHandler):
 class Desktop:
     def __init__(self, path):
         import fcntl
+        self.selection_lock=threading.RLock()
+        self.selected_project=None
+        self.selection_sequence=-1
+        self.selection_epoch=0
+        self.client_bindings={}
         self.owner=DesktopSession(Workspace(path))
         self.lock_file=(self.owner.workspace.root/'.film/server.lock').open('a')
         try: fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -267,13 +285,41 @@ class Desktop:
         self.owner.publish_connection()
         threading.Thread(target=self.socket.serve_forever,daemon=True).start()
 
-    def dispatch(self, message, trusted=False):
+    def dispatch(self, message, trusted=False, *, peer_pid=None):
         project=message.get('project') or 'legacy'
         session=self.owner if project=='legacy' else self.owner.library.session(project)
         if not trusted and not hmac.compare_digest(str(message.get('token','')),session.token):
             raise PermissionError('Desktop authentication missing')
         operation=message.get('operation','api')
+        if operation=='selectProject':
+            if not trusted: raise PermissionError('Native operation requires app transport')
+            body=message.get('body') or {}
+            selected=body.get('selected')
+            if selected is not None and selected!='legacy': self.owner.library.session(selected)
+            sequence=int(body.get('sequence',0))
+            with self.selection_lock:
+                if sequence>self.selection_sequence:
+                    self.selection_sequence=sequence
+                    self.selected_project=selected
+                    self.selection_epoch+=1
+            return {'selected_project':self.selected_project}
         if operation=='api':
+            route=urlsplit(message['route']).path
+            if not trusted and project=='legacy' and message.get('follow_selection') is not False and route in ('/api/call','/api/state','/api/editor','/api/renders'):
+                with self.selection_lock:
+                    selected=self.selected_project
+                    if selected is None: raise ValueError('Open a project in FilmEditor, then call film_assets before editing.')
+                    client=message.get('client_id')
+                    if isinstance(client,str) and 1<=len(client)<=128: client='id:'+client
+                    elif client is None and type(peer_pid) is int and peer_pid>0: client='peer:'+str(peer_pid)
+                    else:
+                        raise ValueError('Reconnect the FilmEditor MCP connection in Codex to load the updated project-routing adapter.')
+                    name=(message.get('body') or {}).get('name')
+                    if route=='/api/call':
+                        if name=='film_assets': self.client_bindings[client]=(selected,self.selection_epoch)
+                        elif self.client_bindings.get(client)!=(selected,self.selection_epoch):
+                            raise ValueError('The open FilmEditor project changed. Call film_assets and inspect the new project before continuing.')
+                    session=self.owner if selected=='legacy' else self.owner.library.session(selected)
             if message['route'].startswith('/api/library'): return session.api(message['route'],message.get('body'))
             with session.operation(): return session.api(message['route'],message.get('body'))
         if not trusted: raise PermissionError('Native operation requires app transport')

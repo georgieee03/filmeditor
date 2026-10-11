@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "0b95d34f2db2d78ac687f7b1d182c673df584e9a46f43871cb18e7c73aa7d361",
-      "bytes": 14247
+      "sha256": "e344be3b8a55f6e402f6c4f5c06d814be44253088d931585f4616b2f1ca93b74",
+      "bytes": 15181
     },
     {
       "path": "SECURITY.md",
@@ -48,8 +48,8 @@
     },
     {
       "path": "app.py",
-      "sha256": "f92264cd15ec54ce33c181331678e69e109f1c6b0dd8c8b52e61a454f2bbcbd2",
-      "bytes": 5618
+      "sha256": "331c57c114e7e65eb03200aa017fc055fc6d817bdeecc496f47e72932907207b",
+      "bytes": 5984
     },
     {
       "path": "docs/ACCEPTANCE.md",
@@ -58,8 +58,8 @@
     },
     {
       "path": "docs/AI_PROVIDER_HANDOFF.md",
-      "sha256": "873588d11ef69f0c6442664eec117b4dbf5be8d5164bca75e3fd71d585ce40de",
-      "bytes": 37475
+      "sha256": "cb5018c7578c144049a366255ec919f956ffd8804d4c586405211db1db09b991",
+      "bytes": 39258
     },
     {
       "path": "docs/AUTO_DETECTION.md",
@@ -67,9 +67,14 @@
       "bytes": 16642
     },
     {
+      "path": "docs/BEATS_REFERENCE_EXPORTS.md",
+      "sha256": "89d91790d298bc69fa01b6d296dec411087e5a7c4820b21cb1e599822b6819d4",
+      "bytes": 10269
+    },
+    {
       "path": "docs/CONTEXT_HANDOFF.md",
-      "sha256": "fe004e6b32ed926ddcf0855897d65d1aac0d11d62f76bd2cb2c87c69eca4a9f4",
-      "bytes": 14129
+      "sha256": "22d801321dc471e01dc2c1d45d3d53e9ed826d33bf8e7a5b5f5a6a8770f764f7",
+      "bytes": 15066
     },
     {
       "path": "docs/ENHANCEMENTS.md",
@@ -113,8 +118,8 @@
     },
     {
       "path": "docs/VALIDATION.md",
-      "sha256": "d03f463b18b550a4c564b972802f2e92131cc39947adcba1e93284c40b429baf",
-      "bytes": 32304
+      "sha256": "ac538ad9c62ef746c1cb912da169f217a0578b5db30fe203209fee7b0bc3aa15",
+      "bytes": 38284
     },
     {
       "path": "docs/mac-handoff-tests.txt",
@@ -133,18 +138,23 @@
     },
     {
       "path": "film/codex.py",
-      "sha256": "8cdc87ba9ab11f5ef1c5d910fe2422a7cd72ee5afb756bdb066dc20feb9de09f",
-      "bytes": 18081
+      "sha256": "49ba847c04b0f0fa2f3548895f1e544d1257b2876a0334de8a60bf8cdafbdd1e",
+      "bytes": 23501
     },
     {
       "path": "film/core.py",
-      "sha256": "9f7eff8cbdc93fe874d0a37b0f954f2e2aac28c9c46ea83f5a6df08bd3f38f12",
-      "bytes": 39322
+      "sha256": "ea3e0caf6f723d962cdaee677b4e3c70834d0e2801a2c213c0f939c86cc4a284",
+      "bytes": 42469
+    },
+    {
+      "path": "film/delivery.py",
+      "sha256": "b51d58a84390a6d89b8aca927cedb0c5d5539303e6d12cfb88e521a8df947f26",
+      "bytes": 33189
     },
     {
       "path": "film/desktop.py",
-      "sha256": "c6ce4d2824069358b2f71864dd54fd4575e86f3e08be5cca6e6ac21cc0719bbe",
-      "bytes": 16621
+      "sha256": "3f1e97ce07e8c407ed145e819f312e30f3450fcc919244930ec15714093d7cd5",
+      "bytes": 19642
     },
     {
       "path": "film/editor.py",
@@ -163,13 +173,18 @@
     },
     {
       "path": "film/library.py",
-      "sha256": "0ec09e5459b3b666e948ef2b1f8cab586f17124387748430c3de92128a629541",
-      "bytes": 5736
+      "sha256": "848a533350f74e7ccce3b856a4f9071a7fd0e4c1cffb63d22cd27eb8f08dc290",
+      "bytes": 6017
     },
     {
       "path": "film/music.py",
-      "sha256": "8827f7189b1dbfa37689e33341c19fe85caba36d3e886d84dcd7d0787c36947d",
-      "bytes": 35263
+      "sha256": "bc833a260de165c726e783a4da4706ccba706759e86b33c507a92a4ba10f8a54",
+      "bytes": 46655
+    },
+    {
+      "path": "film/reference.py",
+      "sha256": "78e67944af2895001244f84ef8c464f534d66b1813829b9304a0b2ca59570a21",
+      "bytes": 26665
     },
     {
       "path": "film/rpc.py",
@@ -178,13 +193,13 @@
     },
     {
       "path": "film/server.py",
-      "sha256": "d5eb5ad8b05b6a0402cc9de784526c8efaba44ec0f4e6490d990292fd2895fef",
-      "bytes": 10854
+      "sha256": "31cf38bcc9d7b83615a5ae50870afb0b882744ed1dca97f968be2f1c3db3cc2e",
+      "bytes": 10888
     },
     {
       "path": "native/FilmEditor.swift",
-      "sha256": "da1f4c7eff3e75ac907bd32b5da90bdb930ab87de7b1265b7b60e6b9c786d1ab",
-      "bytes": 49536
+      "sha256": "ff0b91b429961ba39f05da4c795ec43bb68cea8cc0428deb9689e86ac2736c22",
+      "bytes": 50372
     },
     {
       "path": "native/MakeIcon.swift",
@@ -347,6 +362,11 @@
       "bytes": 5736
     },
     {
+      "path": "tests/native_export_playback.js",
+      "sha256": "9c09cbcb19cf249465faff30be29eaaa6c5cac46171924b3abca0da2501a63e7",
+      "bytes": 8265
+    },
+    {
       "path": "tests/native_import_contract.swift",
       "sha256": "4c5e841a8dc5fde3183658c4ff078fcfec78f6fd83a5f938db8e338bba3a28a2",
       "bytes": 8928
@@ -393,8 +413,8 @@
     },
     {
       "path": "tests/native_smoke.js",
-      "sha256": "15f0767d2e774667e625921e03afbbb3f4558cdf83ba9f336bf369512f56f769",
-      "bytes": 5733
+      "sha256": "1b8f3b417b3b43ab3e57d1656b1ebd1827d72a87352038350a8e5b51b13e103a",
+      "bytes": 5735
     },
     {
       "path": "tests/native_vision_acceptance.py",
@@ -432,9 +452,24 @@
       "bytes": 15497
     },
     {
+      "path": "tests/test_beat_plan.py",
+      "sha256": "aff6bd3b4a757881052f015be1542fb11273f6f185151d6d1ec9a9a87ddd3232",
+      "bytes": 7698
+    },
+    {
+      "path": "tests/test_delivery.py",
+      "sha256": "db00348f214b850920080b8589e19264364cda9f9d930e25eed3b1089883d110",
+      "bytes": 12019
+    },
+    {
+      "path": "tests/test_delivery_gate.py",
+      "sha256": "a297000d6cb735a689465d85ca0eb43e46e9fc02b7cee39c08000f57e58152e1",
+      "bytes": 2650
+    },
+    {
       "path": "tests/test_desktop.py",
-      "sha256": "d9d97d847a822f2a7c424e5446a978a00cfee3411b5ffaddbc79ea5b8c18bb54",
-      "bytes": 4705
+      "sha256": "de88f83b8bb6c2215190d47c7362583dd4683363cd73c313a3648af91c3459a5",
+      "bytes": 9246
     },
     {
       "path": "tests/test_editor_v2.py",
@@ -483,8 +518,8 @@
     },
     {
       "path": "tests/test_mcp_review.py",
-      "sha256": "7661a6df1292d70bfe268d40940aa60f170e5a0882e7a41d201440845e18131a",
-      "bytes": 7834
+      "sha256": "aec6fb81ad85a9524346cc8d255bfdb098c8b52876999683a3008f06a7d1690f",
+      "bytes": 7837
     },
     {
       "path": "tests/test_music.py",
@@ -507,6 +542,16 @@
       "bytes": 3533
     },
     {
+      "path": "tests/test_reference.py",
+      "sha256": "35db910fcd01253f7445d53b1e01d30146169fdf7c6d6db57b2b03b5647c757d",
+      "bytes": 13204
+    },
+    {
+      "path": "tests/test_token_usage.py",
+      "sha256": "c28bd2229d133a1452cfbc37c802e9cbfd6472b36904c33eeebf8c9341e9af0b",
+      "bytes": 5374
+    },
+    {
       "path": "web/advanced.css",
       "sha256": "400f85ad433a28aedc8efac2ea3bd4080a2f898478747001e8c3354b002d7411",
       "bytes": 5090
@@ -518,8 +563,8 @@
     },
     {
       "path": "web/app.js",
-      "sha256": "c4c0e0c07d295430ca795649375ec245a1ef8180930bb82baccaa73160dd7cef",
-      "bytes": 65646
+      "sha256": "f16b6b52d586992745fe72af4341037ae8b0a57b0456f926bd47bcead9c95dcb",
+      "bytes": 68273
     },
     {
       "path": "web/assistant.css",
@@ -528,8 +573,8 @@
     },
     {
       "path": "web/assistant.js",
-      "sha256": "85a175e25014a7d6a7d5f318217bfcce5cc550679319dd4117d9597b12a22708",
-      "bytes": 8118
+      "sha256": "589ee5c0da63f0ebfa48360f51351517ee828cb9f87529914319e4c93fddcfff",
+      "bytes": 8450
     },
     {
       "path": "web/desktop.js",
@@ -548,8 +593,8 @@
     },
     {
       "path": "web/index.html",
-      "sha256": "3b084fe14a685b625210ac6a599ef771b53ac7f44542d1904c7de68b28eb7027",
-      "bytes": 13348
+      "sha256": "ddde6990b65afb6c02f723fe7e2dfba84663928b1a4831093287927ed4b307b2",
+      "bytes": 13486
     },
     {
       "path": "web/music.css",
@@ -568,13 +613,23 @@
     },
     {
       "path": "web/quickstart.js",
-      "sha256": "4763b9b1783bdae3cab8d80c8885ce7a4afa498e7284a9d2f989b0a6707c68e9",
-      "bytes": 5692
+      "sha256": "056f8535960c07617816dba1e32353cba61fa93ce9ae37824ccbe5b553b6c013",
+      "bytes": 6695
+    },
+    {
+      "path": "web/reference.js",
+      "sha256": "20fb01dd0d79a6ad2667061359c0375d58b9ef8eb37bd9aa64998de595c27ce5",
+      "bytes": 9756
     },
     {
       "path": "web/style.css",
-      "sha256": "f6ef94edd1c045b0a9e0c5073312c78200cbe5497dddbbaeead539ee8e815613",
-      "bytes": 30533
+      "sha256": "0df7b46df424db7ff1f06990b00c6d9b471daaee6832267e26f0e8c94d3aaa4c",
+      "bytes": 30719
+    },
+    {
+      "path": "web/token-usage.js",
+      "sha256": "b5053ae4b0e70fd6694180d028a2314948db3ad2051589a0224cc454cf3f6e68",
+      "bytes": 4230
     }
   ]
 }

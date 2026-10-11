@@ -55,6 +55,22 @@ fit the music to the picture, with source offset, looping or trimming and overal
 existing picture and dialogue intact unless asked to change them. Beat markers and tempo are
 estimates, not a verified musical analysis. Render and review the resulting mix. Report the
 track title, creator, source and licence/credits; catalogue metadata is not clearance proof.
+When asked to cut picture to music, use film_music_cut_plan for frame-quantized cuts based on
+BPM AND source beat phase, accounting for the exact music source offset. Use the returned cut
+frames in revision-safe timeline transactions; choose whole-beat or multi-beat pacing for the
+requested style. Inspect musical onsets and picture quality rather than claiming every transient
+is a beat. Explain half/double-tempo uncertainty; user-supplied BPM/phase overrides estimates.
+Do not recut picture for an add-music-only request. A cut plan does not itself edit the timeline.
+For an imported edited reference, film_reference_analyze provides bounded candidate hard-cut
+and gradual-transition timing with beat-alignment estimates. Inspect its images with
+film_view_image and nearby frames before inferring likely transition styles. A flattened video
+cannot reveal the exact original effect or reliably classify every transition. Report the
+analyzed time window, sampling resolution and uncertainty. Use film_extract_audio to create a
+separate audio asset from the selected video's actual audio stream, preserving the original.
+Completed final exports in exports/ are also published to the project's dedicated videos-only
+folder. Poll render_status to completion and report delivery_path. If delivery_warning is
+present, report that the render succeeded but folder publication failed; do not claim otherwise.
+film_export_info shows the destination. Never put logs, audio, credits or caches there.
 For stabilization, subject-following portrait reframing or dialogue cleanup use film_enhance_start
 on an imported source, then poll film_enhance_status. These local jobs preserve the original and
 create full-length derived assets. The current limit is five minutes per source and verified
@@ -75,6 +91,38 @@ Do not open the native Shotcut GUI unless requested; it cannot show unsaved MCP 
 Report failed or unsupported features honestly. Do not call fixture tests real-engine validation.
 '''
 
+TOKEN_USAGE_BREAKDOWN_FIELDS = (
+    'totalTokens', 'inputTokens', 'cachedInputTokens', 'cacheWriteInputTokens',
+    'outputTokens', 'reasoningOutputTokens',
+)
+TOKEN_USAGE_DATA_KEY = 'codex_token_usage'
+TOKEN_USAGE_THREAD_KEY = 'codex_token_usage_thread_id'
+MAX_SAFE_TOKEN_COUNT = 2**53 - 1
+
+
+def normalize_token_usage(value):
+    """Return only known, JSON-safe token counts from an app-server notification."""
+    if not isinstance(value, dict):
+        return None
+    total=value.get('total'); last=value.get('last')
+    if not isinstance(total,dict) or not isinstance(last,dict):
+        return None
+    normalized={}
+    found_count=False
+    for name, breakdown in (('total',total),('last',last)):
+        normalized[name]={}
+        for field in TOKEN_USAGE_BREAKDOWN_FIELDS:
+            count=breakdown.get(field)
+            if type(count) is int and 0 <= count <= MAX_SAFE_TOKEN_COUNT:
+                normalized[name][field]=count
+                found_count=True
+            else:
+                normalized[name][field]=None
+    context=value.get('modelContextWindow')
+    normalized['modelContextWindow']=(context if type(context) is int and
+        0 < context <= MAX_SAFE_TOKEN_COUNT else None)
+    return normalized if found_count else None
+
 class Codex:
     def __init__(self, workspace):
         self.workspace=workspace
@@ -91,6 +139,50 @@ class Codex:
         self.thread_id=None
         self.turn_id=None
         self.busy=False
+        self.token_usage=None
+        self.token_usage_thread_id=None
+        self._load_token_usage()
+
+    def _load_token_usage(self):
+        """Load only usage that is explicitly tied to this workspace's saved thread."""
+        thread_id=self.workspace.data.get('thread_id')
+        saved_thread_id=self.workspace.data.get(TOKEN_USAGE_THREAD_KEY)
+        usage=normalize_token_usage(self.workspace.data.get(TOKEN_USAGE_DATA_KEY))
+        if thread_id and saved_thread_id==thread_id and usage is not None:
+            self.token_usage=usage
+            self.token_usage_thread_id=thread_id
+
+    def _activate_thread(self, thread_id):
+        if not isinstance(thread_id,str) or not thread_id:
+            raise ValueError('Codex returned an invalid thread ID')
+        with self.workspace.lock:
+            with self.lock:
+                previous=self.workspace.data.get('thread_id')
+                if previous != thread_id:
+                    self.workspace.data.pop(TOKEN_USAGE_DATA_KEY,None)
+                    self.workspace.data.pop(TOKEN_USAGE_THREAD_KEY,None)
+                    self.token_usage=None
+                    self.token_usage_thread_id=None
+                self.thread_id=thread_id
+                self.workspace.data['thread_id']=thread_id
+                self.workspace.save()
+
+    def _record_token_usage(self, params):
+        thread_id=params.get('threadId')
+        usage=normalize_token_usage(params.get('tokenUsage'))
+        if not isinstance(thread_id,str) or not thread_id or usage is None:
+            return
+        # Lock order matches reset(): workspace first, then Codex state.
+        with self.workspace.lock:
+            with self.lock:
+                if thread_id != self.thread_id or self.workspace.data.get('thread_id') != thread_id:
+                    return
+                self.token_usage=usage
+                self.token_usage_thread_id=thread_id
+                self.workspace.data[TOKEN_USAGE_DATA_KEY]=usage
+                self.workspace.data[TOKEN_USAGE_THREAD_KEY]=thread_id
+                self.workspace.save()
+                self.event('token_usage',usage)
 
     def event(self,kind,data):
         with self.lock:
@@ -143,6 +235,8 @@ class Codex:
             return
         if method=='item/agentMessage/delta':
             self.event('text',{'item_id':params.get('itemId'),'text':params.get('delta','')})
+        elif method=='thread/tokenUsage/updated':
+            self._record_token_usage(params)
         elif method in ('item/started','item/completed'):
             item=params.get('item',{})
             if item.get('type')=='agentMessage' and method=='item/completed':
@@ -173,7 +267,7 @@ class Codex:
             for key in ('OPENAI_API_KEY','CODEX_API_KEY','OPENAI_BASE_URL'): env.pop(key,None)
             command=[self.workspace.executable('codex'),'-c','forced_login_method="chatgpt"','-c','model_provider="openai"',
                 '-c','mcp_servers.filmeditor.command='+json.dumps(sys.executable),
-                '-c','mcp_servers.filmeditor.args='+json.dumps(['-B',str(ROOT/'app.py'),'mcp','--workspace',str(self.workspace.root)]),
+                '-c','mcp_servers.filmeditor.args='+json.dumps(['-B',str(ROOT/'app.py'),'mcp','--workspace',str(self.workspace.root),'--pin-project']),
                 '-c','approval_policy='+json.dumps(self.policy()['approvalPolicy']),
                 '-c','sandbox_mode='+json.dumps(self.policy()['sandbox']),
                 'app-server']
@@ -216,10 +310,14 @@ class Codex:
                 if model: params['model']=model
                 stored=self.workspace.data.get('thread_id')
                 if stored:
-                    params['threadId']=stored; response=rpc.request('thread/resume',params,timeout=120)
+                    params['threadId']=stored
+                    self.thread_id=stored
+                    try: response=rpc.request('thread/resume',params,timeout=120)
+                    except Exception:
+                        self.thread_id=None
+                        raise
                 else: response=rpc.request('thread/start',params,timeout=120)
-                self.thread_id=response['thread']['id']
-                with self.workspace.lock: self.workspace.data['thread_id']=self.thread_id; self.workspace.save()
+                self._activate_thread(response['thread']['id'])
             params={'threadId':self.thread_id,'input':inputs,'cwd':str(self.workspace.root),
                 'serviceTierForTurn':'default',**self.policy(turn=True)}
             if model: params['model']=model
@@ -253,7 +351,8 @@ class Codex:
             if self.busy and self.rpc and (self.rpc.closed or self.rpc.process.poll() is not None):
                 self.busy=False; self.requests.clear(); self.event('error',{'message':'Codex disconnected; reconnect before another turn'})
             return {'busy':self.busy,'epoch':self.epoch,'permission_mode':self.permission_mode,'events':[e for e in self.events if e['id']>after],
-                'approvals':[{'request_id':k,'method':v['method'],'params':v.get('params',{})} for k,v in self.requests.items()]}
+                'approvals':[{'request_id':k,'method':v['method'],'params':v.get('params',{})} for k,v in self.requests.items()],
+                'token_usage':(self.token_usage if self.token_usage_thread_id==self.workspace.data.get('thread_id') else None)}
 
     def stop(self):
         if self.rpc and self.thread_id and self.turn_id:
@@ -262,9 +361,15 @@ class Codex:
 
     def reset(self):
         if self.busy: raise ValueError('Stop the active turn first')
-        with self.workspace.lock: self.workspace.data['thread_id']=None; self.workspace.save()
-        self.thread_id=None
+        with self.workspace.lock:
+            self.workspace.data['thread_id']=None
+            self.workspace.data.pop(TOKEN_USAGE_DATA_KEY,None)
+            self.workspace.data.pop(TOKEN_USAGE_THREAD_KEY,None)
+            self.workspace.save()
         with self.lock:
+            self.thread_id=None
+            self.token_usage=None
+            self.token_usage_thread_id=None
             self.events.clear(); self.sequence=0; self.epoch=uuid.uuid4().hex
             atomic(self.history_path,b'[]')
         return {'reset':True}

@@ -7,6 +7,7 @@ URLs. Beat detection is a bounded energy-envelope estimate, not semantic analysi
 from __future__ import annotations
 from array import array
 import copy
+from fractions import Fraction
 import hashlib
 import http.client
 import ipaddress
@@ -42,6 +43,15 @@ MUSIC_TOOLS=[
         {'track_id':TEXT},['track_id']),
     _tool('film_music_analyze','Estimate tempo and beat times from an imported audio file using bounded local energy analysis. Estimates can be half/double tempo; not a musical transcription.',
         {'asset_id':TEXT,'max_seconds':{'type':'number','minimum':1,'maximum':600,'default':600}},['asset_id'],True),
+    _tool('film_music_cut_plan','Plan music-led picture cuts at exact project frames without modifying the timeline. Prefer observed onset times from imported audio; an explicit BPM grid requires an explicit or analyzed source-song beat phase. Tempo/phase remain estimates when analyzed.',
+        {'duration_seconds':{'type':'number','exclusiveMinimum':0,'maximum':3600},'asset_id':TEXT,
+         'bpm':{'type':'number','minimum':30,'maximum':300},
+         'beat_phase_seconds':{'type':'number','minimum':0,'maximum':86400},
+         'source_offset_seconds':{'type':'number','minimum':0,'maximum':86400,'default':0},
+         'beats_per_cut':{'type':'integer','minimum':1,'maximum':64,'default':1},
+         'timeline_start_frame':{'type':'integer','minimum':0,'maximum':1000000000,'default':0},
+         'project_path':TEXT,'fps_num':{'type':'integer','minimum':1,'maximum':1000000},
+         'fps_den':{'type':'integer','minimum':1,'maximum':1000000}},['duration_seconds'],True),
     _tool('film_music_score','Fit imported music to the active sequence video span, trimming or looping, level and overall fades. Add a dedicated audio track in one revision-safe transaction; keep dialogue/video unchanged. Beat markers are estimates; no automatic recutting.',
         {'asset_id':TEXT,'project_path':TEXT,'expected_revision':TEXT,
          'source_offset_seconds':{'type':'number','minimum':0,'default':0},
@@ -141,7 +151,8 @@ class Music:
 
     def dispatch(self,name,args):
         methods={'film_music_search':self.search,'film_music_import':self.import_track,
-                 'film_music_analyze':self.analyze,'film_music_score':self.score}
+                 'film_music_analyze':self.analyze,'film_music_score':self.score,
+                 'film_music_cut_plan':self.cut_plan}
         if name not in methods: raise ValueError('Unknown music tool')
         if not isinstance(args,dict): raise ValueError('Arguments must be an object')
         return methods[name](**args)
@@ -371,7 +382,8 @@ class Music:
         norm=sum(value*value for value in onsets)
         duration=len(samples)/sample_rate
         if len(onsets)<150 or norm<1e-8:
-            return {'estimated_bpm':None,'confidence':0,'beats_seconds':[],'duration_analyzed_seconds':duration,'peak_pcm':peak/32768}
+            return {'estimated_bpm':None,'confidence':0,'beats_seconds':[],'detected_beats_seconds':[],
+                    'beat_phase_seconds':None,'duration_analyzed_seconds':duration,'peak_pcm':peak/32768}
         best_lag=0; best=0
         for lag in range(15,61):
             left=sum(value*value for value in onsets[:-lag]); right=sum(value*value for value in onsets[lag:])
@@ -379,16 +391,27 @@ class Music:
             if correlation>best+0.002: best=correlation; best_lag=lag
         confidence=min(1,max(0,best))*min(1,duration/8)
         if best_lag==0 or best<0.3:
-            return {'estimated_bpm':None,'confidence':round(confidence,3),'beats_seconds':[],'duration_analyzed_seconds':duration,'peak_pcm':peak/32768}
+            return {'estimated_bpm':None,'confidence':round(confidence,3),'beats_seconds':[],'detected_beats_seconds':[],
+                    'beat_phase_seconds':None,'duration_analyzed_seconds':duration,'peak_pcm':peak/32768}
         phase=max(range(best_lag),key=lambda offset:sum(onsets[offset::best_lag]))
         beats=[round(index*hop/sample_rate,4) for index in range(phase,len(onsets),best_lag)]
+        # Retain observed peaks near the estimated beat grid rather than calling
+        # every extrapolated grid point a detected beat. Empty/quiet windows have
+        # no observed beat; consumers must preserve that distinction.
+        observed=[]; radius=max(1,round(best_lag*.3)); threshold=max(onsets)*.08
+        for expected in range(phase,len(onsets),best_lag):
+            low=max(0,expected-radius); high=min(len(onsets),expected+radius+1)
+            index=max(range(low,high),key=lambda i:onsets[i])
+            if onsets[index]>max(1e-6,threshold) and (not observed or index>observed[-1]): observed.append(index)
         return {'estimated_bpm':round(60*sample_rate/(hop*best_lag),2),'confidence':round(confidence,3),
-                'beats_seconds':beats,'duration_analyzed_seconds':duration,'peak_pcm':round(peak/32768,5)}
+                'beats_seconds':beats,'detected_beats_seconds':[round(index*hop/sample_rate,4) for index in observed],
+                'beat_phase_seconds':round(phase*hop/sample_rate,4),'onset_resolution_seconds':hop/sample_rate,
+                'duration_analyzed_seconds':duration,'peak_pcm':round(peak/32768,5)}
 
     def analyze(self,asset_id,max_seconds=600):
         seconds=_number(max_seconds,'max_seconds',1,600)
         asset=self.ws.asset(asset_id); path=self.ws.path(asset['path'])
-        stamp=hashlib.sha256(f'{path}:{path.stat().st_size}:{path.stat().st_mtime_ns}:{seconds}'.encode()).hexdigest()
+        stamp=hashlib.sha256(f'beat-v2:{path}:{path.stat().st_size}:{path.stat().st_mtime_ns}:{seconds}'.encode()).hexdigest()
         cache=self.directory/('analysis-'+stamp+'.json')
         if cache.exists(): return json.loads(cache.read_text())
         with self.ws.heavy():
@@ -406,6 +429,116 @@ class Music:
         from .core import atomic
         atomic(cache,json.dumps(value).encode())
         return value
+
+    def _plan_fps(self,project_path,fps_num,fps_den):
+        from .core import unpack
+        if project_path is not None and (fps_num is not None or fps_den is not None):
+            raise ValueError('Use project_path or explicit fps_num/fps_den, not both')
+        path=None; revision=None
+        if fps_num is not None or fps_den is not None:
+            if type(fps_num) is not int or type(fps_den) is not int or not 1<=fps_num<=1000000 or not 1<=fps_den<=1000000:
+                raise ValueError('Supply positive integer fps_num and fps_den together')
+            fps=Fraction(fps_num,fps_den)
+        else:
+            path=self.ws.path(project_path) if project_path is not None else self.ws.active()
+            snapshot=unpack(self.ws.forward('inspect_project',{'path':str(path)})); profile=snapshot['profile']
+            revision=snapshot.get('revision')
+            try:
+                if 'frame_rate_num' in profile and 'frame_rate_den' in profile:
+                    fps=Fraction(int(profile['frame_rate_num']),int(profile['frame_rate_den']))
+                else: fps=Fraction(str(profile['fps'])).limit_denominator(1000000)
+            except (TypeError,ValueError,ZeroDivisionError,KeyError) as exc: raise ValueError('Project has no usable frame rate') from exc
+        _number(float(fps),'Project fps',1,240)
+        return fps,path,revision
+
+    def cut_plan(self,duration_seconds,asset_id=None,bpm=None,beat_phase_seconds=None,source_offset_seconds=0,
+                 beats_per_cut=1,timeline_start_frame=0,project_path=None,fps_num=None,fps_den=None):
+        """Return revision-independent frame boundaries; authoring is a later edit.
+
+        A song's offset is independent of beat phase. We never silently assume
+        that the start of a file or the start of a trimmed song is a downbeat.
+        """
+        duration=_number(duration_seconds,'duration_seconds',.000001,3600)
+        offset=_number(source_offset_seconds,'source_offset_seconds',0,86400)
+        if type(beats_per_cut) is not int or not 1<=beats_per_cut<=64: raise ValueError('beats_per_cut must be an integer from 1 to 64')
+        if type(timeline_start_frame) is not int or not 0<=timeline_start_frame<=1000000000: raise ValueError('timeline_start_frame must be a nonnegative integer')
+        tempo=_number(bpm,'bpm',30,300) if bpm is not None else None
+        phase=_number(beat_phase_seconds,'beat_phase_seconds',0,86400) if beat_phase_seconds is not None else None
+        if asset_id is None and (tempo is None or phase is None): raise ValueError('Supply an imported audio asset, or explicit bpm and beat_phase_seconds')
+        if asset_id is not None: self.ws.asset(asset_id)
+        fps,path,revision=self._plan_fps(project_path,fps_num,fps_den)
+        rate=float(fps); frames=math.floor(duration*rate+.5)
+        if frames<1: raise ValueError('The requested duration must cover at least one project frame')
+        quantized_duration=frames/rate
+        analysis=None; warnings=[]
+        if tempo is None or phase is None:
+            analysis=self.analyze(asset_id)
+            if analysis.get('estimated_bpm') is None: raise ValueError('No usable beat estimate; supply explicit bpm and beat_phase_seconds after listening')
+            detected=analysis.get('detected_beats_seconds') or []
+            grid=analysis.get('beats_seconds') or []
+            if tempo is None: tempo=_number(analysis['estimated_bpm'],'Estimated bpm',30,300)
+            if phase is None:
+                candidate=detected[0] if detected else analysis.get('beat_phase_seconds')
+                candidate=candidate if candidate is not None else (grid[0] if grid else None)
+                if candidate is None: raise ValueError('No usable beat phase; supply beat_phase_seconds after listening')
+                phase=_number(candidate,'Analyzed beat phase',0,86400)
+            warnings.extend(analysis.get('limitations',[]))
+        tempo_origin='explicit' if bpm is not None else 'estimated'
+        phase_origin='explicit' if beat_phase_seconds is not None else 'observed_onset' if analysis and analysis.get('detected_beats_seconds') else 'estimated_grid'
+        observed=analysis.get('detected_beats_seconds') if analysis else None
+        if analysis is not None and bpm is None and beat_phase_seconds is None:
+            coverage=min(float(analysis.get('duration_analyzed_seconds',0)),float(analysis.get('audio_duration_seconds',0)))
+            if offset+quantized_duration>coverage+1e-6:
+                raise ValueError('Analyzed audio does not cover the requested song window; shorten the window or supply explicit bpm and beat_phase_seconds')
+            source_beats=observed or analysis.get('beats_seconds',[])
+            beat_source='observed_onsets' if observed else 'estimated_grid'
+            audible=[float(value) for value in source_beats if offset-1e-9<=float(value)<offset+quantized_duration-1e-9]
+            if observed and analysis.get('beats_seconds'):
+                anchor=float(analysis['beats_seconds'][0]); interval=60/tempo
+                indexed=[(math.floor((beat-anchor)/interval+.5),beat) for beat in audible]
+                first_index=indexed[0][0] if indexed else 0
+                selected=[beat for index,beat in indexed if (index-first_index)%beats_per_cut==0]
+            else: selected=audible[::beats_per_cut]
+            if not observed: warnings.append('No observed beat peaks were retained; cut times use the estimated regular grid.')
+            if observed and analysis.get('beats_seconds') and len(observed)<len(analysis['beats_seconds'])*.85:
+                warnings.append('Quiet beat windows were missed; cuts use observed candidates at the estimated beat-grid cadence, not a verified musical meter.')
+        else:
+            interval=60/tempo
+            first=math.ceil((offset-phase)/interval-1e-9)
+            count=max(0,math.ceil((offset+quantized_duration-phase)/interval-1e-9)-first)
+            if count>18001: raise ValueError('Beat plan exceeds its event bound')
+            selected=[phase+(first+index)*interval for index in range(0,count,beats_per_cut)]
+            beat_source='explicit_bpm_grid' if bpm is not None else 'estimated_bpm_grid'
+            if analysis: warnings.append('BPM or phase was overridden; a regular grid anchored to the selected phase is used instead of observed onset timing.')
+            warnings.append('A regular BPM grid assumes constant tempo; its song duration and musical downbeat are not independently verified.')
+        cuts=[]; seen=set()
+        for beat in selected:
+            relative=beat-offset; frame=timeline_start_frame+math.floor(relative*rate+.5)
+            if not timeline_start_frame<frame<timeline_start_frame+frames or frame in seen: continue
+            seen.add(frame)
+            cuts.append({'frame':frame,'time_seconds':frame/rate,'relative_seconds':(frame-timeline_start_frame)/rate,
+                         'source_beat_seconds':round(beat,9),'quantization_error_seconds':round((frame-timeline_start_frame)/rate-relative,9)})
+        cuts.sort(key=lambda item:item['frame'])
+        if not cuts: warnings.append('No internal cut boundaries fell in the requested window; this plan contains a single segment.')
+        boundaries=[timeline_start_frame]+[item['frame'] for item in cuts]+[timeline_start_frame+frames]
+        segments=[{'start_frame':start,'end_frame_exclusive':end,'duration_frames':end-start}
+                  for start,end in zip(boundaries,boundaries[1:])]
+        half_beat=30/tempo
+        if cuts and segments[0]['duration_frames']/rate<half_beat:
+            warnings.append('The first cut falls within half a beat of the music start; the opening is a partial beat. Review this short opening segment before authoring.')
+        if cuts and segments[-1]['duration_frames']/rate<half_beat:
+            warnings.append('The last segment is shorter than half a beat; the requested end creates a partial closing beat. Review this short closing segment before authoring.')
+        if analysis: warnings.append('Beat detection is an onset-envelope estimate and may be half/double tempo; listen and review the resulting edit.')
+        return {'asset_id':asset_id,'project_path':str(path) if path is not None else None,'project_revision':revision,
+                'fps_num':fps.numerator,'fps_den':fps.denominator,'fps':rate,'bpm':tempo,'bpm_origin':tempo_origin,
+                'beat_phase_seconds':phase,'phase_origin':phase_origin,'beat_source':beat_source,'beats_per_cut':beats_per_cut,
+                'source_offset_seconds':offset,'timeline_start_frame':timeline_start_frame,'duration_frames':frames,
+                'requested_duration_seconds':duration,'duration_seconds':quantized_duration,'end_frame_exclusive':timeline_start_frame+frames,
+                'cut_frames':[item['frame'] for item in cuts],'cuts':cuts,'segments':segments,
+                'heuristic_beat_confidence':analysis.get('confidence') if analysis else None,
+                'analysis_partial':analysis.get('partial',False) if analysis else None,'warnings':list(dict.fromkeys(warnings)),
+                'video_recut':False,'dialogue_modified':False,
+                'authoring_note':'Use these exact frames in a separately authorized revision-safe picture edit; this tool only plans boundaries.'}
 
     @staticmethod
     def _span(snapshot):

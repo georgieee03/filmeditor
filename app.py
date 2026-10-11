@@ -10,12 +10,15 @@ import socket
 import stat
 import sys
 import threading
+import uuid
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 import webbrowser
 from film.core import Workspace, atomic, result
 from film.server import FilmServer
+
+MCP_CLIENT_ID=uuid.uuid4().hex
 
 def normalize_mcp_result(value):
     """Keep media/structured results compatible with the installed Codex client.
@@ -29,7 +32,7 @@ def normalize_mcp_result(value):
         if isinstance(block,dict):block.pop('annotations',None)
     return normalized
 
-def api_request(workspace,route,payload=None):
+def api_request(workspace,route,payload=None,*,follow_selection=True):
     """Connect to the current app-owned workspace, using its advertised transport."""
     config=json.loads((workspace/'.film/connection.json').read_text())
     if config.get('transport')=='unix':
@@ -37,7 +40,7 @@ def api_request(workspace,route,payload=None):
         info=path.stat()
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode & 0o077:
             raise ValueError('Desktop socket must be private to this user')
-        message={'operation':'api','route':route,'project':config['project'],'token':config['token']}
+        message={'operation':'api','route':route,'project':config['project'],'token':config['token'],'client_id':MCP_CLIENT_ID,'follow_selection':follow_selection}
         if payload is not None: message['body']=payload
         with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as connection:
             connection.settimeout(3700); connection.connect(str(path))
@@ -55,9 +58,9 @@ def api_request(workspace,route,payload=None):
         with urllib.request.urlopen(req,timeout=3700) as response: return json.load(response)
     except urllib.error.HTTPError as exc: raise ValueError(exc.read().decode()[:4000]) from exc
 
-def mcp(workspace):
+def mcp(workspace,follow_selection=True):
     def api(route,payload=None):
-        return api_request(workspace,route,payload)
+        return api_request(workspace,route,payload,follow_selection=follow_selection)
     while True:
         line=sys.stdin.buffer.readline(4*1024**2+1)
         if not line: break
@@ -84,9 +87,10 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('mode',nargs='?',choices=['serve','mcp','desktop'],default='serve')
     p.add_argument('--workspace',default=str(Path.home()/'Movies/FilmEditor'))
+    p.add_argument('--pin-project',action='store_true',help='Keep this MCP client on its explicit workspace, including the legacy root project')
     p.add_argument('--port',type=int,default=4317); p.add_argument('--no-browser',action='store_true')
     a=p.parse_args(); path=Path(a.workspace).expanduser().resolve()
-    if a.mode=='mcp': return mcp(path)
+    if a.mode=='mcp': return mcp(path,follow_selection=not a.pin_project)
     if a.mode=='desktop':
         from film.desktop import run
         return run(path)

@@ -58,6 +58,7 @@ S = {'type':'string'}
 TOOLS = [
     schema('film_status','Report local executables and integration status. Not a render-readiness certificate.',read=True),
     schema('film_assets','Read ordered media and reference labels (Video 1 = first video, Reference 1 = first reference), IDs, brief and selected timeline. Never infer footage contents from filenames.',read=True),
+    schema('film_export_info','Read the dedicated completed-video folder for this project. Metadata, previews, credits and audio remain in the private project workspace.',read=True),
     schema('film_brief','Read or update the creative brief.',{'text':S}),
     schema('film_new_project','Create/select an editable Shotcut timeline. Probe representative sources before choosing dimensions/FPS.',{'name':S,'width':{'type':'integer','minimum':16},'height':{'type':'integer','minimum':16},'fps_num':{'type':'integer','minimum':1},'fps_den':{'type':'integer','minimum':1}}),
     schema('film_select_project','Select an existing edits/*.mlt.',{'path':S},['path']),
@@ -229,9 +230,10 @@ class Workspace:
         from .music import MUSIC_TOOLS
         from .ingest import FILM_INGEST_TOOLS
         from .enhance import ENHANCE_TOOLS
+        from .reference import REFERENCE_TOOLS
         try: self.connect_shotcut()
         except Exception as exc: self.engine_error=str(exc)
-        return copy.deepcopy(TOOLS+MUSIC_TOOLS+FILM_INGEST_TOOLS+ENHANCE_TOOLS+self.engine_tools)
+        return copy.deepcopy(TOOLS+MUSIC_TOOLS+FILM_INGEST_TOOLS+ENHANCE_TOOLS+REFERENCE_TOOLS+self.engine_tools)
 
     def active(self):
         with self.lock:
@@ -307,6 +309,11 @@ class Workspace:
                         committed=unpack(value)
                         committed.setdefault('warnings',[]).append(warning)
                         value=result(committed)
+                if name=='render_status' and not value.get('isError'):
+                    metadata=unpack(value)
+                    output=Path(metadata.get('output_path') or '')
+                    if getattr(self,'delivery_project_id',None) and output.is_relative_to(self.root/'exports'):
+                        value=result(self.publish_render(metadata))
                 return value
         with self.heavy():
             # Hold the edit lock only after heavy work can begin, so waiting for an
@@ -325,6 +332,33 @@ class Workspace:
                     if readiness and readiness.get('warnings'): metadata.setdefault('warnings',[]).extend(readiness['warnings'])
                     value=result(metadata)
                 return value
+
+    def publish_render(self,metadata):
+        """Only verified video streams may enter the public video-only folder."""
+        from .delivery import publish_completed, VIDEO_SUFFIXES
+        if metadata.get('status')!='completed': return metadata
+        output=Path(metadata.get('output_path') or '')
+        if output.suffix.lower() not in VIDEO_SUFFIXES or str(metadata.get('consumer_properties',{}).get('vn','0'))=='1' or str(metadata.get('preset','')).startswith('audio-'):
+            return {**metadata,'delivery_skipped':'Audio-only and non-video exports remain in the private project workspace.'}
+        try:
+            output=self.path(output)
+            info=output.stat()
+            stamp=[str(output),info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns]
+            with self.lock:
+                cache=self.root/'.film/delivery-media.json'
+                verified=json.loads(cache.read_text()) if cache.exists() else {}
+                if verified.get(metadata['job_id'])!=stamp:
+                    probe=self.run_media([self.executable('ffprobe'),'-v','error',*MEDIA_INPUT_OPTIONS,
+                        '-show_streams','-of','json',str(output)],timeout=30)
+                    if probe.returncode: raise ValueError('Could not verify the completed export video stream')
+                    streams=json.loads(probe.stdout).get('streams',[])
+                    if not any(s.get('codec_type')=='video' and not s.get('disposition',{}).get('attached_pic') for s in streams):
+                        return {**metadata,'delivery_skipped':'This export contains no video stream; it remains in the private project workspace.'}
+                    verified[metadata['job_id']]=stamp
+                    atomic(cache,json.dumps(verified).encode())
+            return publish_completed(self,metadata)
+        except (OSError,ValueError,KeyError) as exc:
+            return {**metadata,'delivery_warning':'Render completed, but video delivery could not be verified: '+str(exc)}
 
     def render_credits(self, metadata):
         """Attach credits to manual and Codex exports from the immutable MLT input."""
@@ -520,7 +554,10 @@ class Workspace:
 
     def call(self,name,args):
         if not isinstance(args,dict): raise ValueError('Arguments must be an object')
-        if name.startswith('film_enhance_'):
+        if name in ('film_reference_analyze','film_extract_audio'):
+            from .reference import Reference
+            value=Reference(self).dispatch(name,args)
+        elif name.startswith('film_enhance_'):
             from .enhance import Enhance
             with self.lock:
                 if not hasattr(self,'enhance'): self.enhance=Enhance(self)
@@ -536,8 +573,12 @@ class Workspace:
                 if not hasattr(self,'music'): self.music=Music(self)
             value=self.music.dispatch(name,args)
         elif name=='film_status': value=self.status()
+        elif name=='film_export_info':
+            from .delivery import export_info
+            value=export_info(self)
         elif name=='film_assets':
             with self.lock: value=copy.deepcopy(self.data)
+            value.update(workspace=str(self.root),project_id=getattr(self,'delivery_project_id','legacy'),project_name=getattr(self,'delivery_project_name',self.root.name))
             value.pop('deleted_assets',None)
             value['assets']=self.ordered_assets()
             for asset in value['assets']:
@@ -584,6 +625,8 @@ class Workspace:
     def state(self):
         with self.lock: data=copy.deepcopy(self.data); data['jobs']=copy.deepcopy(list(self.jobs.values()))
         data.pop('deleted_assets',None)
+        from .delivery import export_info
+        data.update(export_info(self))
         data['assets']=self.ordered_assets()
         outputs=[]
         for directory in ('exports','generated','cache'):

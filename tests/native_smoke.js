@@ -24,8 +24,8 @@
     document.getElementById('ai-edit-dialog').close();
     document.getElementById('quickstart-open').click();
     check(document.getElementById('quickstart-dialog').open, 'in-app quickstart opens');
-    for(let step=0;step<5;step++){document.getElementById('quickstart-next').click();await wait(0);}
-    check(document.querySelector('#quickstart-dialog h1').textContent === 'Preview, then export', 'all six quickstart steps reachable');
+    for(let step=0;step<6;step++){document.getElementById('quickstart-next').click();await wait(0);}
+    check(document.querySelector('#quickstart-dialog h1').textContent === 'Preview, then export', 'all seven quickstart steps reachable');
     document.getElementById('quickstart-next').click();
     check(!document.getElementById('quickstart-dialog').open, 'quickstart closes into editing');
     check(Boolean(document.getElementById('film-advanced-open')), 'advanced controls loaded from local scheme');

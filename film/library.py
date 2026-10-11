@@ -18,6 +18,8 @@ class Library:
             existing=bool(ws.data['assets'] or ws.data['active_project'] or list((ws.root/'edits').glob('*.mlt')))
             self.data={'projects':[{'id':'legacy','name':'Existing projects','created':time.time()}] if existing else []}
             self.save()
+        from .delivery import bind_workspace
+        bind_workspace(owner.workspace,owner.workspace.root,'legacy','Existing projects')
 
     def save(self): atomic(self.file,json.dumps(self.data,indent=2).encode())
 
@@ -57,6 +59,8 @@ class Library:
             if not self.entry(ident): raise ValueError('Project not found or deleted')
             if ident not in self.sessions:
                 ws=Workspace(self.owner.workspace.root/'projects'/ident)
+                from .delivery import bind_workspace
+                bind_workspace(ws,self.owner.workspace.root,ident,self.entry(ident)['name'])
                 ws.heavy_slots=self.owner.workspace.heavy_slots
                 ws.render_peers=self.owner.workspace.render_peers
                 ws.render_peers.append(ws)
