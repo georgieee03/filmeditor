@@ -234,28 +234,70 @@ final class NativeWebView: WKWebView {
     var onFilesDropped: (([URL], CGPoint) -> Void)?
     var onPromisesDropped: (([NSFilePromiseReceiver], CGPoint) -> Void)?
     var onUnsupportedDrop: (() -> Void)?
+    var importReport: NativeImportReport?
+    private var reportedSequence: Int?
+    private var reportedStages: Set<String> = []
     private func promises(_ sender: NSDraggingInfo) -> [NSFilePromiseReceiver] {
         sender.draggingPasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver] ?? []
     }
     private func fileURLs(_ sender: NSDraggingInfo) -> [URL] {
         sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
     }
+    private func nativeOperation(_ sender: NSDraggingInfo) -> NSDragOperation? {
+        let pasteboard = sender.draggingPasteboard
+        guard pasteboard.canReadObject(forClasses: [NSFilePromiseReceiver.self], options: nil)
+                || pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) else { return nil }
+        return sender.draggingSourceOperationMask.contains(.copy) ? .copy : []
+    }
+    private func reportDrag(_ stage: String, _ sender: NSDraggingInfo) {
+        guard let report = importReport else { return }
+        if reportedSequence != sender.draggingSequenceNumber {
+            reportedSequence = sender.draggingSequenceNumber; reportedStages.removeAll()
+        }
+        guard reportedStages.insert(stage).inserted else { return }
+        report.record("drag-" + stage, ["sequence": sender.draggingSequenceNumber,
+                                      "external": sender.draggingSource == nil,
+                                      "sourceOperationMask": sender.draggingSourceOperationMask.rawValue,
+                                      "nativeCopySupported": nativeOperation(sender) == .copy,
+                                      "advertisedTypes": (sender.draggingPasteboard.types ?? []).prefix(100).map { $0.rawValue }])
+    }
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if !promises(sender).isEmpty || !fileURLs(sender).isEmpty { return .copy }
+        reportDrag("entered", sender)
+        if let operation = nativeOperation(sender) { return operation }
         return super.draggingEntered(sender)
     }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        reportDrag("updated", sender)
+        // Native drags do not initialize WebKit's HTML drag state in entered.
+        // Keep ownership here so WebKit cannot replace .copy with its operation.
+        if let operation = nativeOperation(sender) { return operation }
+        return super.draggingUpdated(sender)
+    }
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        reportDrag("prepared", sender)
+        if let operation = nativeOperation(sender) { return operation == .copy }
+        return super.prepareForDragOperation(sender)
+    }
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        reportDrag("performed", sender)
+        if let operation = nativeOperation(sender), operation != .copy { return false }
         let point = convert(sender.draggingLocation, from: nil)
         let location = CGPoint(x: point.x, y: isFlipped ? point.y : bounds.height - point.y)
         // Photos can advertise a JPEG poster alongside its promised movie.
         // Receive the file promise before considering any URL or WebKit fallback.
         let promised = promises(sender)
-        if !promised.isEmpty { onPromisesDropped?(promised, location); return true }
+        if !promised.isEmpty {
+            importReport?.record("drop-route", ["route": "file-promises", "count": promised.count,
+                                                "receiverFileTypes": promised.prefix(200).map { Array($0.fileTypes.prefix(100)) }])
+            onPromisesDropped?(promised, location); return true
+        }
         let urls = fileURLs(sender)
         if !urls.isEmpty {
+            importReport?.record("drop-route", ["route": "file-urls", "count": urls.count])
             onFilesDropped?(urls, location); return true
         }
         if sender.draggingSource == nil {
+            importReport?.record("drop-route", ["route": "unsupported-preview"])
             onUnsupportedDrop?(); return false
         }
         return super.performDragOperation(sender)
@@ -274,6 +316,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     var initialProject: String?
     var smokeScript: String?
     var smokeReport: String?
+    var importReport: NativeImportReport?
     var smokeExit = false
     var launchErrors: [String] = []
     var navigationGeneration = 0
@@ -291,11 +334,16 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 if args[index] == "--project" { initialProject = args[index + 1] }
                 if args[index] == "--smoke-script" { smokeScript = args[index + 1] }
                 if args[index] == "--smoke-report" { smokeReport = args[index + 1] }
+                if args[index] == "--import-report" {
+                    do { importReport = try NativeImportReport(path: args[index + 1]) }
+                    catch { launchErrors.append(error.localizedDescription) }
+                }
             }
             if args[index] == "--smoke-exit" { smokeExit = true }
         }
         guard let resources = Bundle.main.resourceURL else { return }
         NSApp.setActivationPolicy(.regular)
+        NSApp.appearance = NSAppearance(named: .darkAqua)
         let configuration = WKWebViewConfiguration()
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
@@ -303,6 +351,8 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         scheme = LocalScheme(resources: resources, backend: backend)
         configuration.setURLSchemeHandler(scheme, forURLScheme: "filmapp")
         webView = NativeWebView(frame: .zero, configuration: configuration)
+        webView.importReport = importReport
+        importReport?.record("import-report-started")
         webView.navigationDelegate = self; webView.uiDelegate = self
         webView.registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) })
         webView.onFilesDropped = { [weak self] urls, point in self?.importURLs(urls, point: point) }
@@ -355,7 +405,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             }
             backend.request(project: senderProject, body: body, route: route) { [weak self] in self?.resolve(id, $0) }
         case "importDialog": importDialog(id: id, kind: body["kind"] as? String ?? "footage", project: senderProject)
-        case "photosDialog": importPhotos(id: id, kind: body["kind"] as? String ?? "footage", project: senderProject)
+        case "photosDialog": importPhotos(id: id, kind: body["kind"] as? String ?? "footage", project: senderProject, route: "photos-button")
         case "upload": backend.request(operation: "upload", project: senderProject, body: body) { [weak self] in self?.resolve(id, $0) }
         case "cancelUploads": backend.request(operation: "cancelUploads", project: senderProject) { [weak self] in self?.resolve(id, $0) }
         case "saveMedia": saveMedia(id: id, body: body)
@@ -375,6 +425,8 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             resolve(id, .failure(NativeFailure(message: "Open a project before importing media."))); return
         }
         let panel = NSOpenPanel(); panel.title = "Import media into FilmEditor"
+        let trace = UUID().uuidString
+        importReport?.record("import-started", ["import": trace, "route": "file-panel"])
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = true
         let extensions = ["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "mxf", "wav", "mp3", "m4a", "flac", "aac", "ogg", "opus", "aif", "aiff", "wma", "alac", "png", "jpg", "jpeg", "webp", "heic", "heif", "cube", "srt", "vtt"]
         panel.allowedContentTypes = extensions.compactMap { UTType(filenameExtension: $0) }
@@ -385,10 +437,15 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         photos.toolTip = "Select videos and pictures directly from your Photos library"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self else { return }
-            if response == .continue { self.importPhotos(id: id, kind: kind, project: project); return }
-            if response != .OK { self.resolve(id, .success([])); return }
+            if response == .continue { self.importPhotos(id: id, kind: kind, project: project, route: "file-panel-photos"); return }
+            if response != .OK {
+                self.importReport?.record("import-cancelled", ["import": trace]); self.resolve(id, .success([])); return
+            }
+            if let report = self.importReport { report.record("files-selected", ["import": trace, "files": NativeImportReport.files(panel.urls)]) }
             self.backend.request(operation: "import", project: project,
-                                 body: ["paths": panel.urls.map(\.path), "kind": kind]) { self.resolve(id, $0) }
+                                 body: ["paths": panel.urls.map(\.path), "kind": kind]) {
+                self.reportImportResult($0, trace: trace); self.resolve(id, $0)
+            }
         }
     }
 
@@ -403,15 +460,46 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('filmeditor-native-import-status',{detail:" + literal + "}))", completionHandler: nil)
     }
 
-    private func importPhotos(id: String? = nil, kind: String = "footage", project: String? = nil) {
-        guard webView.url?.query?.contains("project=") == true else { showError("Open a project before importing media."); return }
-        guard photosPicker == nil else { return }
+    private func reportImportResult(_ result: Result<Any, Error>, trace: String) {
+        guard let report = importReport else { return }
+        switch result {
+        case .success(let value):
+            let assets = value as? [[String: Any]] ?? []
+            report.record("import-completed", ["import": trace, "count": assets.count,
+                                                "assets": assets.prefix(200).map { asset -> [String: Any] in
+                var metadata: [String: Any] = [:]
+                for key in ["id", "name", "kind", "type", "mime", "bytes"] {
+                    if let value = asset[key] { metadata[key] = value }
+                }
+                return metadata
+            }])
+        case .failure(let error):
+            report.record("import-failed", ["import": trace, "errorType": String(reflecting: type(of: error))])
+        }
+    }
+
+    private func importPhotos(id: String? = nil, kind: String = "footage", project: String? = nil, route: String = "menu") {
+        func reject(_ message: String) {
+            if let id { resolve(id, .failure(NativeFailure(message: message))) } else { showError(message) }
+        }
+        guard webView.url?.query?.contains("project=") == true else { reject("Open a project before importing media."); return }
+        guard photosPicker == nil else { reject("The Photos picker is already open."); return }
+        let trace = UUID().uuidString
+        importReport?.record("import-started", ["import": trace, "route": route])
         let project = project ?? currentProject, generation = navigationGeneration
-        photosPicker = PhotosMediaPicker(parent: window) { [weak self] providers in
+        photosPicker = PhotosMediaPicker(parent: window, report: importReport) { [weak self] providers in
             guard let self else { return }; self.photosPicker = nil
-            if providers.isEmpty { if let id { self.resolve(id, .success([])) }; return }
+            self.importReport?.record("picker-selection", ["import": trace, "count": providers.count,
+                                                           "providers": providers.prefix(200).map { provider -> [String: Any] in
+                ["advertisedTypes": Array(provider.registeredTypeIdentifiers.prefix(100)),
+                 "requestedType": NativeMediaFiles.preferredType(provider) ?? "unsupported"]
+            }])
+            if providers.isEmpty {
+                self.importReport?.record("import-cancelled", ["import": trace])
+                if let id { self.resolve(id, .success([])) }; return
+            }
             self.receiveMedia(project: project, generation: generation, kind: kind, id: id, point: nil,
-                              message: "Receiving \(providers.count) selected files from Photos…") { directory, cancellation, done in
+                              message: "Receiving \(providers.count) selected files from Photos…", trace: trace) { directory, cancellation, done in
                 NativeMediaFiles.receiveProviders(providers, into: directory, cancellation: cancellation, completion: done)
             }
         }
@@ -421,47 +509,99 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private func importPromises(_ receivers: [NSFilePromiseReceiver], point: CGPoint) {
         guard webView.url?.query?.contains("project=") == true else { showError("Open a project before importing media."); return }
         let project = currentProject, generation = navigationGeneration
-        webView.evaluateJavaScript("document.getElementById('import-kind')?.value || 'footage'") { [weak self] kind, _ in
-            self?.receiveMedia(project: project, generation: generation, kind: kind as? String ?? "footage", id: nil, point: point,
-                               message: "Receiving \(receivers.count) files from Photos or another app…") { directory, _, done in
-                NativeMediaFiles.receivePromises(receivers, into: directory, completion: done)
-            }
+        let trace = UUID().uuidString
+        let selectedKind = NativeImportKind()
+        importReport?.record("import-started", ["import": trace, "route": "drop-promises", "count": receivers.count,
+                                              "receiverFileTypes": receivers.prefix(200).map { Array($0.fileTypes.prefix(100)) }])
+        webView.evaluateJavaScript("document.getElementById('import-kind')?.value || 'footage'") { kind, _ in
+            selectedKind.complete(kind as? String ?? "footage")
+        }
+        // Negotiate while performDragOperation is still active. Only the later
+        // backend import waits for the asynchronous UI metadata above.
+        receiveMedia(project: project, generation: generation, kind: "footage", id: nil, point: point,
+                     message: "Receiving \(receivers.count) files from Photos or another app…", trace: trace,
+                     selectedKind: selectedKind) { directory, _, done in
+            NativeMediaFiles.receivePromises(receivers, into: directory, report: importReport, trace: trace, completion: done)
         }
     }
 
-    private func receiveMedia(project: String, generation: Int, kind: String, id: String?, point: CGPoint?, message: String,
+    private func receiveMedia(project: String, generation: Int, kind: String, id: String?, point: CGPoint?, message: String, trace: String,
+                              selectedKind: NativeImportKind? = nil,
                               receive: (URL, NativeImportCancellation, @escaping (Result<[URL], Error>) -> Void) -> Void) {
-        guard !terminating, generation == navigationGeneration, project == currentProject else { return }
+        let report = importReport
+        guard !terminating, generation == navigationGeneration, project == currentProject else {
+            report?.record("import-ignored", ["import": trace, "stage": "before-receive",
+                                             "terminating": terminating, "generationMatches": generation == navigationGeneration,
+                                             "projectMatches": project == currentProject])
+            return
+        }
         do {
             let directory = try NativeMediaFiles.stagingDirectory(), cancellation = NativeImportCancellation()
             importDirectories[directory] = cancellation
             importStatus(message, busy: true)
+            report?.record("receive-started", ["import": trace])
             receive(directory, cancellation) { [weak self] result in
+                if let report {
+                    switch result {
+                    case .success(let urls): report.record("receive-finished", ["import": trace, "files": NativeImportReport.files(urls)])
+                    case .failure(let error): report.record("receive-failed", ["import": trace, "errorType": String(reflecting: type(of: error))])
+                    }
+                }
                 DispatchQueue.main.async {
-                    guard let self else { try? FileManager.default.removeItem(at: directory); return }
+                    guard let self else {
+                        report?.record("import-ignored", ["import": trace, "stage": "after-receive", "applicationReleased": true])
+                        try? FileManager.default.removeItem(at: directory); return
+                    }
                     func clean() { try? FileManager.default.removeItem(at: directory); self.importDirectories.removeValue(forKey: directory) }
-                    guard !self.terminating, !cancellation.isCancelled, generation == self.navigationGeneration, project == self.currentProject else { clean(); return }
+                    guard !self.terminating, !cancellation.isCancelled, generation == self.navigationGeneration, project == self.currentProject else {
+                        report?.record("import-ignored", ["import": trace, "stage": "after-receive",
+                                                         "terminating": self.terminating, "cancelled": cancellation.isCancelled,
+                                                         "generationMatches": generation == self.navigationGeneration,
+                                                         "projectMatches": project == self.currentProject])
+                        clean(); return
+                    }
                     do {
                         let urls = try result.get()
                         guard urls.count <= 200 else { throw NativeFailure(message: "Import up to 200 files at a time.") }
-                        self.importStatus("Importing \(urls.count) media files…", busy: true)
-                        self.backend.request(operation: "import", project: project, body: ["paths": urls.map(\.path), "kind": kind]) { result in
-                            defer { clean() }
-                            guard !self.terminating, generation == self.navigationGeneration, project == self.currentProject else { return }
-                            self.importStatus("", busy: false)
-                            if let id { self.resolve(id, result) }
-                            else {
-                                do { self.dispatchImported(try result.get(), point: point) }
-                                catch { self.showError(error.localizedDescription) }
+                        if let report = self.importReport { report.record("files-received", ["import": trace, "files": NativeImportReport.files(urls)]) }
+                        func importFiles(_ resolvedKind: String) {
+                            guard !self.terminating, !cancellation.isCancelled, generation == self.navigationGeneration, project == self.currentProject else {
+                                report?.record("import-ignored", ["import": trace, "stage": "before-backend",
+                                                                 "terminating": self.terminating, "cancelled": cancellation.isCancelled,
+                                                                 "generationMatches": generation == self.navigationGeneration,
+                                                                 "projectMatches": project == self.currentProject])
+                                clean(); return
+                            }
+                            self.importStatus("Importing \(urls.count) media files…", busy: true)
+                            self.backend.request(operation: "import", project: project, body: ["paths": urls.map(\.path), "kind": resolvedKind]) { result in
+                                defer { clean() }
+                                self.reportImportResult(result, trace: trace)
+                                guard !self.terminating, generation == self.navigationGeneration, project == self.currentProject else {
+                                    report?.record("import-ignored", ["import": trace, "stage": "after-backend",
+                                                                     "terminating": self.terminating, "generationMatches": generation == self.navigationGeneration,
+                                                                     "projectMatches": project == self.currentProject])
+                                    return
+                                }
+                                self.importStatus("", busy: false)
+                                if let id { self.resolve(id, result) }
+                                else {
+                                    do { self.dispatchImported(try result.get(), point: point) }
+                                    catch { self.showError(error.localizedDescription) }
+                                }
                             }
                         }
+                        if let selectedKind { selectedKind.whenReady(importFiles) } else { importFiles(kind) }
                     } catch {
+                        self.reportImportResult(.failure(error), trace: trace)
                         clean(); self.importStatus("", busy: false)
                         if let id { self.resolve(id, .failure(error)) } else { self.showError(error.localizedDescription) }
                     }
                 }
             }
-        } catch { if let id { resolve(id, .failure(error)) } else { showError(error.localizedDescription) } }
+        } catch {
+            reportImportResult(.failure(error), trace: trace)
+            if let id { resolve(id, .failure(error)) } else { showError(error.localizedDescription) }
+        }
     }
 
     private func dispatchImported(_ assets: Any, point: CGPoint?) {
@@ -475,10 +615,13 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         guard webView.url?.query?.contains("project=") == true else { showError("Open a project before importing media."); return }
         let project = currentProject
         let generation = navigationGeneration
+        let trace = UUID().uuidString
+        if let report = importReport { report.record("import-started", ["import": trace, "route": "drop-file-urls", "files": NativeImportReport.files(urls)]) }
         webView.evaluateJavaScript("document.getElementById('import-kind')?.value || 'footage'") { [weak self] kind, _ in
             guard let self else { return }
             self.backend.request(operation: "import", project: project,
                                  body: ["paths": urls.map(\.path), "kind": kind as? String ?? "footage"]) { result in
+                self.reportImportResult(result, trace: trace)
                 do {
                     let assets = try result.get()
                     guard self.navigationGeneration == generation, self.currentProject == project else { return }
@@ -626,6 +769,7 @@ final class Application: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             while self.backend.process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
             if self.backend.process.isRunning { self.backend.process.terminate() }
             for directory in directories { try? FileManager.default.removeItem(at: directory) }
+            self.importReport?.flush()
             DispatchQueue.main.async { NSApp.reply(toApplicationShouldTerminate: true) }
         }
         return .terminateLater

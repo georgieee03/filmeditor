@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import threading
@@ -584,9 +585,24 @@ class Workspace:
         with self.lock: data=copy.deepcopy(self.data); data['jobs']=copy.deepcopy(list(self.jobs.values()))
         data.pop('deleted_assets',None)
         data['assets']=self.ordered_assets()
+        outputs=[]
+        for directory in ('exports','generated','cache'):
+            entries=[]
+            for path in (self.root/directory).glob('*'):
+                # Renderers publish hidden staging files by atomically renaming
+                # them. Never advertise a staging name as playable output.
+                if path.name.startswith('.') or not (path.suffix.lower() in MEDIA or
+                        directory=='exports' and path.name.endswith('.credits.txt')): continue
+                try: info=path.stat()
+                except (FileNotFoundError,NotADirectoryError): continue
+                if stat.S_ISREG(info.st_mode): entries.append((info.st_mtime,path))
+            # Sort cached metadata: an entry can disappear after enumeration,
+            # and sorting must not perform another unguarded stat.
+            outputs.extend(str(path.relative_to(self.root)) for _,path in
+                sorted(entries,key=lambda entry:entry[0],reverse=True))
         data.update(workspace=str(self.root),projects=[str(p.relative_to(self.root)) for p in sorted((self.root/'edits').glob('*.mlt')) if '.render-' not in p.name],
             scenes=[p.parent.name for p in (self.root/'scenes').glob('*/index.html')],
-            outputs=[str(p.relative_to(self.root)) for d in ('exports','generated','cache') for p in sorted((self.root/d).glob('*'),key=lambda p:p.stat().st_mtime,reverse=True) if p.suffix.lower() in MEDIA or d=='exports' and p.name.endswith('.credits.txt')])
+            outputs=outputs)
         return data
 
     def run_media(self,command,timeout):

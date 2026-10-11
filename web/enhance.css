@@ -32,3 +32,28 @@
 .film-enhance-job .film-enhance-actions{margin-bottom:0}
 .film-enhance-job .film-enhance-actions button[hidden]{display:none}
 @media(max-width:560px){.film-enhance-dialog{padding:15px}.film-enhance-field{grid-template-columns:1fr;gap:5px}.film-enhance-job .film-enhance-actions button{flex:1 1 42%}}
+
+.film-enhance-open{border-color:#4b5660;color:#c3d9f7;border-radius:4px}
+.film-enhance-dialog{background:#23272b;border-color:#4b535b;border-radius:9px;color:#e1e5e9;box-shadow:0 24px 70px #000b}
+.film-enhance-heading h2{color:#eef1f4}
+.film-enhance-close{color:#b7c0c9}
+.film-enhance-intro,.film-enhance-help{color:#adb5be}
+.film-enhance-section{border-top-color:#3a4249}
+.film-enhance-section h3{color:#e0e4e8}
+.film-enhance-source-name{color:#d6e1ef}
+.film-enhance-field{color:#b8c0c9}
+.film-enhance-field select,.film-enhance-field input{background:#171a1d;border-color:#444c54;color:#e0e4e8}
+.film-enhance-manual{border-left-color:#7294be;background:#1c2024;color:#c7cfd8}
+.film-enhance-actions button,.film-enhance-small-button{border-color:#46505a;color:#d0d7de}
+.film-enhance-small-button.danger{color:#f0b7b8}
+#film-enhance-start{background:#2968b4;border-color:#5996eb;color:#fff}
+.film-enhance-message{color:#b3d1b6}
+.film-enhance-job{background:#1d2125;border-color:#414950;border-radius:6px}
+.film-enhance-job-heading strong{color:#e0e4e8}
+.film-enhance-job-state{color:#bac3cc}
+.film-enhance-job-state.active{color:#b2d0fa}
+.film-enhance-job-state.complete{color:#b4d8bb}
+.film-enhance-job-state.failed{color:#f0abad}
+.film-enhance-job-detail{color:#b2bbc4}
+
+#film-enhance-start:hover{background:#3475bf}

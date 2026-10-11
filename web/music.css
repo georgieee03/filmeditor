@@ -1,1 +1,18 @@
 .music-dialog{width:min(700px,90vw);max-height:88vh;overflow:auto}.music-row{display:flex;gap:8px;align-items:center;margin:12px 0}.music-row input:not([type=file]),.music-row select{flex:1;min-width:0}.music-settings{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.music-settings label{display:flex;align-items:center;justify-content:space-between;gap:10px}.music-settings input[type=number]{width:90px}.music-settings input[type=checkbox]{width:auto}.music-status{color:var(--blue,#8bb6f3);line-height:1.5}.music-credits,.music-result pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 ui-monospace,monospace;color:#b6bbc7;max-height:150px;overflow:auto}.music-results{display:grid;gap:8px;margin-top:12px}.music-result{border:1px solid #3b3e44;border-radius:4px;padding:12px;display:grid;gap:7px}.music-result>span{font-size:12px;color:#acb2bd}.music-result button{justify-self:start}.music-result details{font-size:11px}.music-dialog h3{margin-top:24px;font-size:14px}.music-dialog .hint{line-height:1.6}
+
+.music-dialog{width:min(720px,92vw);padding:23px;background:#23272b;border-color:#4b535b;color:#e1e5e9}
+.music-row{gap:9px;margin:11px 0}
+.music-row button{border:1px solid #46505a;color:#d2d9e0}
+.music-settings{gap:8px 22px}
+.music-settings label{color:#b8c0c9;font-size:11px}
+.music-settings input[type=number]{background:#171a1d;border-color:#444c54;color:#e0e4e8}
+.music-status{color:#b5d1fa}
+.music-credits,.music-result pre{background:#171a1d;border:1px solid #373f46;border-radius:4px;color:#c5cdd5;padding:9px}
+.music-results{gap:9px}
+.music-result{background:#1d2125;border-color:#3e474f;border-radius:6px;padding:12px 13px;gap:8px}
+.music-result>span{color:#cbd2d9;font-size:11px;line-height:1.5}
+.music-result button{border-color:#4b5660;color:#d0d8df}
+.music-result details{color:#b6bec7;line-height:1.55}
+.music-dialog h3{margin-top:22px;color:#e4e8ec;font-size:13px}
+.music-dialog .hint{color:#a8b0b9}
+@media(max-width:620px){.music-settings{grid-template-columns:1fr}.music-dialog{padding:16px}}

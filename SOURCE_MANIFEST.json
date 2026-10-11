@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "a40d5f585fb4249de1b73a9f8302196a6ad28af55ce02c2cdfa10c594d05e28c",
-      "bytes": 14430
+      "sha256": "79f80cd16b7139e98371ca33a78275929ab4f4ca0722137967b8516f4725a506",
+      "bytes": 14559
     },
     {
       "path": "SECURITY.md",
@@ -68,8 +68,8 @@
     },
     {
       "path": "docs/CONTEXT_HANDOFF.md",
-      "sha256": "afba5848f7bc692147d8305153929e121f39f6d8e93a6652d4acb94c0c28c12b",
-      "bytes": 9964
+      "sha256": "eec50897d976f75707802f80b9679f3cedca63534538884ae4dd9c837330e1fc",
+      "bytes": 11581
     },
     {
       "path": "docs/ENHANCEMENTS.md",
@@ -88,8 +88,8 @@
     },
     {
       "path": "docs/PHOTOS_IMPORT.md",
-      "sha256": "4086665adb3f626580b287081f0fc34e6d49d4157162f802f775eaf58eaae523",
-      "bytes": 6186
+      "sha256": "16faabe62deefc133ab8e2aee35031a13eee706cfb7903835501c2c1979acb2b",
+      "bytes": 11129
     },
     {
       "path": "docs/PREMIERE_PARITY.md",
@@ -108,8 +108,8 @@
     },
     {
       "path": "docs/VALIDATION.md",
-      "sha256": "61a7c2733f7ef3b51b64aa21fedf591937fb874763c072920ea318fba9daf6a2",
-      "bytes": 24010
+      "sha256": "c2346f630dd7f5c65faba7017f841a921a99d9eda1e4049dc2bde985a6e19dc7",
+      "bytes": 28431
     },
     {
       "path": "docs/mac-handoff-tests.txt",
@@ -133,8 +133,8 @@
     },
     {
       "path": "film/core.py",
-      "sha256": "cc0a70de6bf0db0995404c32152c7b760509ce3e6b2db3d464f086da4ce71f97",
-      "bytes": 38564
+      "sha256": "9f7eff8cbdc93fe874d0a37b0f954f2e2aac28c9c46ea83f5a6df08bd3f38f12",
+      "bytes": 39322
     },
     {
       "path": "film/desktop.py",
@@ -178,8 +178,8 @@
     },
     {
       "path": "native/FilmEditor.swift",
-      "sha256": "81d3f9d3eb3fb0281734f57c532b923850d7fbd26ddb856fed341ad0c57fab84",
-      "bytes": 39822
+      "sha256": "da1f4c7eff3e75ac907bd32b5da90bdb930ab87de7b1265b7b60e6b9c786d1ab",
+      "bytes": 49536
     },
     {
       "path": "native/MakeIcon.swift",
@@ -188,8 +188,8 @@
     },
     {
       "path": "native/MediaImport.swift",
-      "sha256": "0e3d8198b60cd1f7ab4cdfb4350b76f28f96fb31cf9046dfd0c0b095edf069d2",
-      "bytes": 6001
+      "sha256": "29e76bc492a70c873902c1ef0d34c9244240e262b8e2f9dd24b3d98b5970cc67",
+      "bytes": 11922
     },
     {
       "path": "native/VisionReframe.swift",
@@ -307,6 +307,16 @@
       "bytes": 6107
     },
     {
+      "path": "tests/native_actual_media_acceptance.py",
+      "sha256": "6c9c9f5e57e3c8111bb6fd6011a3357576ae5427db95c07ca96d4b65469cf06f",
+      "bytes": 8380
+    },
+    {
+      "path": "tests/native_actual_media_smoke.js",
+      "sha256": "13181668aa820e7394a431ea8e982a54d38a5b92e164d81bba91c1545f5bc060",
+      "bytes": 8092
+    },
+    {
       "path": "tests/native_ai_smoke.js",
       "sha256": "4f1a57389e88625afcb783ebaabb26945c7afe46bf67e3ba11a51a5f551fb4eb",
       "bytes": 2464
@@ -323,8 +333,8 @@
     },
     {
       "path": "tests/native_import_contract.swift",
-      "sha256": "1c78cde7686ed3000b9cee7d767f7c904b18311ff7686d2d2be1aab433fb9828",
-      "bytes": 3987
+      "sha256": "4c5e841a8dc5fde3183658c4ff078fcfec78f6fd83a5f938db8e338bba3a28a2",
+      "bytes": 8928
     },
     {
       "path": "tests/native_multiclip_acceptance.py",
@@ -462,9 +472,14 @@
       "bytes": 17700
     },
     {
+      "path": "tests/test_output_publication.py",
+      "sha256": "f84806020f035bd1d3d9f49a2c40286ccb7c5e372c7791122daf0d8c5bfe20d4",
+      "bytes": 3533
+    },
+    {
       "path": "web/advanced.css",
-      "sha256": "a97c12c3be41eccfcea39bb88758c15255db2040ca05f56b2e56827e6757309d",
-      "bytes": 3606
+      "sha256": "400f85ad433a28aedc8efac2ea3bd4080a2f898478747001e8c3354b002d7411",
+      "bytes": 5090
     },
     {
       "path": "web/advanced.js",
@@ -478,8 +493,8 @@
     },
     {
       "path": "web/assistant.css",
-      "sha256": "f98348aa17f9643071d992df89e5fb3e96a2304d1d27b294018c0256295fe19b",
-      "bytes": 735
+      "sha256": "974494a189473779db896dc1db50befeda058de6bcdc15991093c639678047d8",
+      "bytes": 1370
     },
     {
       "path": "web/assistant.js",
@@ -493,8 +508,8 @@
     },
     {
       "path": "web/enhance.css",
-      "sha256": "a403459f8f6e77293b938151ab91b12763ca8c2ce2d5254e015dbf920ade9295",
-      "bytes": 2890
+      "sha256": "26683d53b16672d09464f1fbd4cebd5270f94745c1efe757508595043cc001b3",
+      "bytes": 4210
     },
     {
       "path": "web/enhance.js",
@@ -508,8 +523,8 @@
     },
     {
       "path": "web/music.css",
-      "sha256": "446ad278c9e6a2dbdb0da74e9b515aef5ac64b6f2daec670617fea754bd5eb34",
-      "bytes": 1029
+      "sha256": "f57dd52030a45cd3401d30f00cc558532352de9b426d23cc677096588e9b3cf0",
+      "bytes": 2041
     },
     {
       "path": "web/music.js",
@@ -518,8 +533,8 @@
     },
     {
       "path": "web/quickstart.css",
-      "sha256": "631f808c2c804da47fede6071d6cfed4fdd00312d432ddf562de4e621f593be4",
-      "bytes": 945
+      "sha256": "7a992fc1923d24bcc50cf38eaffe3325a5382fa50efc6e4e8f11c99d059151a2",
+      "bytes": 1785
     },
     {
       "path": "web/quickstart.js",
@@ -528,8 +543,8 @@
     },
     {
       "path": "web/style.css",
-      "sha256": "c92f6a48e392de844a0e3a77ea264588d3963893a47aee243c7a5eb4186ff861",
-      "bytes": 19171
+      "sha256": "f6ef94edd1c045b0a9e0c5073312c78200cbe5497dddbbaeead539ee8e815613",
+      "bytes": 30533
     }
   ]
 }

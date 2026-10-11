@@ -205,3 +205,59 @@
     gap: 5px;
   }
 }
+
+#film-advanced-dialog {
+  background: #23272b;
+  border-color: #4b535b;
+  border-radius: 9px;
+  color: #e1e5e9;
+  box-shadow: 0 24px 70px #000b;
+}
+
+.film-advanced-heading h2 {
+  color: #eef1f4;
+  font-size: 18px;
+  font-weight: 550;
+}
+
+.film-advanced-close { color: #b7c0c9; }
+.film-advanced-intro,
+.film-advanced-help,
+.film-advanced-selection { color: #adb5be; }
+.film-advanced-selection {
+  border-color: #424a52;
+  background: #1c2024;
+  color: #c8d8ed;
+}
+.film-advanced-section {
+  background: #1d2125;
+  border-color: #414950;
+  border-radius: 6px;
+}
+.film-advanced-section h3 { color: #e1e5e9; }
+.film-advanced-field { color: #b8c0c9; }
+.film-advanced-field > input,
+.film-advanced-field > select,
+.film-advanced-field > textarea {
+  color: #e0e4e8;
+  background: #171a1d;
+  border-color: #444c54;
+}
+.film-advanced-check { color: #bac2ca; }
+.film-advanced-check input { accent-color: #8db8ff; }
+.film-advanced-actions button,
+.film-advanced-actions select,
+#film-advanced-open { border-color: #46505a; }
+.film-advanced-actions button { color: #d0d7de; }
+.film-advanced-actions .film-advanced-primary,
+.film-advanced-footer .film-advanced-primary {
+  background: #2968b4;
+  border-color: #5996eb;
+  color: #fff;
+}
+.film-advanced-actions select { background: #171a1d; color: #e0e4e8; }
+.film-advanced-footer { border-top-color: #3a4249; }
+.film-advanced-footer > span { color: #aab3bc; }
+#film-advanced-open { color: #c6d9f3; }
+
+.film-advanced-primary:hover{background:#3475bf}
